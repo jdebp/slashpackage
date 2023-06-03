@@ -1,0 +1,139 @@
+diff --git font.c font.c
+index ef61574..e571feb 100644
+--- font.c
++++ font.c
+@@ -921,6 +921,7 @@ static u_char *createFullWidthGlyph(TFont *p, uint16_t ucs2,
+ {
+ 	int i, x, y;
+ 	u_char *glyph, *s, *d, *cp, c;
++	u_short width;
+ 
+ 	assert(initialized);
+ 	assert(p != NULL);
+@@ -929,7 +930,8 @@ static u_char *createFullWidthGlyph(TFont *p, uint16_t ucs2,
+ 	i = codeToIndex(p, ucs2);
+ 	if (i == -1)
+ 		return NULL; /* out of range */
+-	if (p->width != p->glyphWidths[i])
++	width = p->glyphWidths ? p->glyphWidths[i] : p->width;
++	if (p->width != width)
+ 		return NULL; /* fullwidth */
+ 	glyph = calloc(p->bytesPerWidth * 2 * p->height, sizeof(u_char));
+ 	if (glyph == NULL)
+@@ -938,7 +940,7 @@ static u_char *createFullWidthGlyph(TFont *p, uint16_t ucs2,
+ 	for (y = 0; y < p->height; y++) {
+ 		cp = s;
+ 		d = glyph + (y * p->bytesPerWidth);
+-		for (x = p->glyphWidths[i]; x >= 8; x -= 8) {
++		for (x = width; x >= 8; x -= 8) {
+ 			c = *cp++;
+ 			if (c & 0x80) d[0] |= 0xc0;
+ 			if (c & 0x40) d[0] |= 0x30;
+@@ -963,7 +965,7 @@ static u_char *createFullWidthGlyph(TFont *p, uint16_t ucs2,
+ 		}
+ 		s += p->bytesPerWidth;
+ 	}
+-	*glyphWidth = p->glyphWidths[i] * 2;
++	*glyphWidth = width * 2;
+ 	return glyph;
+ }
+ 
+@@ -972,6 +974,7 @@ static u_char *createHalfWidthGlyph(TFont *p, uint16_t ucs2,
+ {
+ 	int i, x, y;
+ 	u_char *glyph, *s, *d, *cp, c;
++	u_short width;
+ 
+ 	assert(initialized);
+ 	assert(p != NULL);
+@@ -980,7 +983,8 @@ static u_char *createHalfWidthGlyph(TFont *p, uint16_t ucs2,
+ 	i = codeToIndex(p, ucs2);
+ 	if (i == -1)
+ 		return NULL; /* out of range */
+-	if (p->width == p->glyphWidths[i])
++	width = p->glyphWidths ? p->glyphWidths[i] : p->width;
++	if (p->width == width)
+ 		return NULL; /* halfwidth */
+ 	glyph = calloc(p->bytesPerWidth * p->height, sizeof(u_char));
+ 	if (glyph == NULL)
+@@ -989,7 +993,10 @@ static u_char *createHalfWidthGlyph(TFont *p, uint16_t ucs2,
+ 	for (y = 0; y < p->height; y++) {
+ 		cp = s;
+ 		d = glyph + (y * p->bytesPerWidth);
+-		for (x = p->glyphWidths[i]; x >= 16; x -= 16) {
++#if DEBUG
++		fprintf(stderr, "createHalfWidthGlyph: writing row %u to %p\n", y, d);
++#endif
++		for (x = width; x >= 16; x -= 16) {
+ 			c = *cp++;
+ 			if ((c & 0x80) || (c & 0x40)) *d |= 0x80;
+ 			if ((c & 0x20) || (c & 0x10)) *d |= 0x40;
+@@ -1018,7 +1025,7 @@ static u_char *createHalfWidthGlyph(TFont *p, uint16_t ucs2,
+ 		}
+ 		s += p->bytesPerWidth;
+ 	}
+-	*glyphWidth = (p->glyphWidths[i] / 2);
++	*glyphWidth = (width / 2);
+ 	return glyph;
+ }
+ 
+@@ -1073,6 +1080,7 @@ static void saveUnifontGlyph(TFont *p)
+ {
+ 	int i;
+ 	struct unifontGlyphList *current;
++	u_short width;
+ 
+ 	assert(initialized);
+ 	assert(p != NULL);
+@@ -1087,8 +1095,9 @@ static void saveUnifontGlyph(TFont *p)
+ 		if (i == -1)
+ 			return; /* out of range */
+ 		if (current->glyph == NULL) {
++			width = p->glyphWidths ? p->glyphWidths[i] : p->width;
+ 			current->glyph = p->glyphs[i];
+-			current->glyphWidth = p->glyphWidths[i];
++			current->glyphWidth = width;
+ 		}
+ 	}
+ }
+@@ -1112,7 +1121,8 @@ static void restoreUnifontGlyph(TFont *p)
+ 			return; /* out of range */
+ 		if (current->glyph != NULL) {
+ 			p->glyphs[i] = current->glyph;
+-			p->glyphWidths[i] = current->glyphWidth;
++			if (p->glyphWidths)
++				p->glyphWidths[i] = current->glyphWidth;
+ 		}
+ 	}
+ }
+@@ -1141,22 +1151,26 @@ void font_unifontGlyph(TFont *p, int ambiguousWidth)
+ 			if (ambiguousWidth == 1 &&
+ 			    current->halfWidthGlyph != NULL) {
+ 				p->glyphs[i] = current->halfWidthGlyph;
+-				p->glyphWidths[i] =
++				if (p->glyphWidths)
++					p->glyphWidths[i] =
+ 						current->halfWidthGlyphWidth;
+ 			} else if (ambiguousWidth == 2 &&
+ 				   current->fullWidthGlyph != NULL) {
+ 				p->glyphs[i] = current->fullWidthGlyph;
+-				p->glyphWidths[i] =
++				if (p->glyphWidths)
++					p->glyphWidths[i] =
+ 						current->fullWidthGlyphWidth;
+ 			}
+ 		} else {
+ 			if (current->halfWidthGlyph != NULL) {
+ 				p->glyphs[i] = current->halfWidthGlyph;
+-				p->glyphWidths[i] =
++				if (p->glyphWidths)
++					p->glyphWidths[i] =
+ 						current->halfWidthGlyphWidth;
+ 			} else if (current->fullWidthGlyph != NULL) {
+ 				p->glyphs[i] = current->fullWidthGlyph;
+-				p->glyphWidths[i] =
++				if (p->glyphWidths)
++					p->glyphWidths[i] =
+ 						current->fullWidthGlyphWidth;
+ 			}
+ 		}
