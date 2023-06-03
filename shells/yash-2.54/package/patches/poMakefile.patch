@@ -1,0 +1,19 @@
+diff --git po/Makefile.in po/Makefile.in
+index 500898b..f40ca81 100644
+--- po/Makefile.in
++++ po/Makefile.in
+@@ -99,12 +99,12 @@ en@quot.po: $(DOMAIN).pot en@quot.ih en@quot.hd
+ 	$(MSGINIT) -i $(DOMAIN).pot --no-translator -l en@quot -o - 2>/dev/null | \
+ 	sed -f en@quot.ih | \
+ 	$(MSGCONV) -t UTF-8 | \
+-	$(MSGFILTER) sed -f quot.sed >$@
++	$(MSGFILTER) --newline sed -f quot.sed >$@
+ en@boldquot.po: $(DOMAIN).pot en@boldquot.ih en@boldquot.hd
+ 	$(MSGINIT) -i $(DOMAIN).pot --no-translator -l en@boldquot -o - 2>/dev/null | \
+ 	sed -f en@boldquot.ih | \
+ 	$(MSGCONV) -t UTF-8 | \
+-	$(MSGFILTER) sed -f boldquot.sed >$@
++	$(MSGFILTER) --newline sed -f boldquot.sed >$@
+ $(POFILES_QUOT:.po=.ih): insert-hd.sin
+ 	target='$@'; lang=$${target%.*}; \
+ 	sed -e '/^#/d' -e "s/HEADER/$${lang}.hd/g" insert-hd.sin >$@
