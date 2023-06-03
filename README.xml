@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet href="docbook-xml.css" type="text/css"?>
+
+<refentry id="/package">
+
+<refmeta xmlns:xi="http://www.w3.org/2001/XInclude">
+	<refentrytitle>/package</refentrytitle>
+	<manvolnum>7</manvolnum>
+	<refmiscinfo class="manual">miscellany</refmiscinfo>
+	<refmiscinfo class="source">slashpackage</refmiscinfo>
+</refmeta>
+
+<refnamediv>
+	<refname>/package</refname>
+	<refpurpose>package hierarchy</refpurpose>
+</refnamediv>
+
+<refsection>
+	<title>Description</title>
+
+	<para>
+		The <filename>/package</filename> hierarchy is an implementation of <ulink url="https://jdebp.uk/FGA/slashpackage.html">Daniel J. Bernstein's "slashpackage" concept</ulink>.
+	</para>
+
+	<refsection>
+		<title>Structure</title>
+
+		<para>
+			The subdirectories of <filename>/package</filename> follow roughly the same hierarchy in the first sub-level as the FreeBSD <citerefentry><refentrytitle>ports</refentrytitle><manvolnum>7</manvolnum></citerefentry> collection and the NetBSD packages collection.
+			For examples:
+		</para>
+		<variablelist>
+			<varlistentry>
+				<term><filename>admin</filename></term>
+				<listitem>
+					<para>system administration tools</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>editors</filename></term>
+				<listitem>
+					<para>text and document editors</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>fonts</filename></term>
+				<listitem>
+					<para>fonts and tools for manipulating font files</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>prog</filename></term>
+				<listitem>
+					<para>programmer tools, such as compilers</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>shells</filename></term>
+				<listitem>
+					<para>various command-line shells, from the Almquist shell through the Watanabe shell to the Z shell</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>sysutils</filename></term>
+				<listitem>
+					<para>system-level utilities such as terminal emulators</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+
+		<para>
+			Below the first sub-level, however, the structure is quite different, containing directories named after individual packages <emphasis>including their version numbers</emphasis>, allowing (unlike in the case of FreeBSD and NetBSD) multiple versions of packages to be present side-by-side.
+		</para>
+	</refsection>
+
+	<refsection>
+		<title>Native packages</title>
+
+		<para>
+			Native packages are softwares that are directly distributed in the slashpackage format by their authors.
+			They have no presence in the enclosing git repository.
+		</para>
+
+		<para>
+			Everything, including the <filename>package</filename> subdirectory, is expected to be provided by the native package itself.
+			An entry in the next higher level's <filename>.gitignore</filename> file optionally ensures that native packages are wholly excluded from being checked in to this repository.
+		</para>
+
+		<para>
+			The package's entire tree is supplied in one of two ways:
+		</para>
+		<itemizedlist>
+			<listitem>
+				<para>
+					In the traditional slashpackage mechanism, it is supplied as an archive which must be extracted into the right place.
+					Conventionally the archive has pathnames relative to <filename>/package</filename> with the correct version number.
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+					Alternatively, the package's entire tree is checked out from its own source control repository, kept somewhere else.
+					The onus is on the person checking out the source to ensure that the right version is checked out.
+				</para>
+			</listitem>
+		</itemizedlist>
+	</refsection>
+
+	<refsection>
+		<title>Non-native packages</title>
+
+		<para>
+			Non-native packages are softwares that are not directly distributed in the slashpackage format by their authors.
+		</para>
+
+		<para>
+			For each non-native package this repository contains a <filename>package</filename> subdirectory containing at minimum:
+		</para>
+
+		<variablelist>
+			<varlistentry>
+				<term><filename>package/compile</filename></term>
+				<listitem>
+					<para>
+						This is a shell script, suitable for the Debian Almquist shell or the Watanabe shell in its minimal POSIX mode.
+						Its interpreter line is always <code>#!/bin/sh</code>, possibly with the <arg choice="plain">-e</arg> argument.
+					</para>
+					<note>
+						It is permitted to also use the Z shell, Korn shell(s), and Bourne Again shell in their POSIX emulation modes to run the script; what is forbidden is to use any of their extension features, which unfortunately they do not wholly disable in their POSIX emulation modes, in the script.
+					</note>
+					<para>
+						This script when run will download a source archive or check out the correct tag from a local source control repository in a parallel directory, patch the source as necessary, compile the parts of the package that require compilation, and (atomically) copy the output files to their final locations; all within the package's own sub-tree.
+					</para>
+				</listitem>
+			</varlistentry>
+		</variablelist>
+
+		<para>
+			The parallel source control repository for a non-native package is incorporated as <ulink url="https://git-scm.com/book/en/v2/Git-Tools-Submodules">a git submodule</ulink>.
+		</para>
+	</refsection>
+</refsection>
+
+<refsection id="HISTORY" xreflabel="HISTORY">
+	<title>History</title>
+
+	<para>
+		"slashpackage" was <ulink url="https://cr.yp.to/slashpackage.html">invented by Daniel J. Bernstein</ulink> at the turn of the 21st century.
+		People who took the concept and ran with it included <ulink url="https://code.dogmap.org/slashpackage/">Paul Jarc</ulink>, Owe Ohse, and (until 2014) Laurent Bercot.
+	</para>
+
+	<para>
+		This implementation was created in 2023.
+	</para>
+</refsection>
+
+<refsection>
+	<title>Author</title>
+
+	<para>
+		<author>
+			<personname><firstname>Jonathan</firstname> <surname>de Boyne Pollard</surname></personname>
+		</author>
+	</para>
+</refsection>
+
+</refentry>
