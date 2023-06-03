@@ -1,0 +1,18 @@
+--- ./src/nativebarclient.h.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/nativebarclient.h	2023-05-21 10:32:03.119619819 +0100
+@@ -16,13 +16,13 @@
+  *                                                                         *
+  ***************************************************************************/
+ 
+-#ifndef NATIVEBARLIENT_H
++#ifndef NATIVEBARCLIENT_H
+ #define NATIVEBARCLIENT_H
+ 
+ #include <inputclient.h>
+ #include <window.h>
+ 
+-class Candilist;
++struct Candilist;
+ 
+ class NativeBarClient : public Window,public InputClient {
+     public:

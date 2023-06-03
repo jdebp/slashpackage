@@ -1,0 +1,190 @@
+--- ./src/display/fbdev.cpp.orig	2003-04-01 15:06:15.000000000 +0100
++++ ./src/display/fbdev.cpp	2023-05-21 19:36:00.488688937 +0100
+@@ -26,6 +26,7 @@
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
+ #include <assert.h>
++#include <vector>
+ 
+ #include "fbdev.h"
+ #include "fblinear4.h"
+@@ -45,7 +46,13 @@
+ int FBDev::mFd = -1;
+ unsigned long FBDev::mNextLine = 0;
+ unsigned long FBDev::mNextPlane = 0;
++#if defined(__FreeBSD__)
++#if defined(OLD_FREEBSD_MODE)
+ int FBDev::mCurrentMode = 0;
++#else
++int FBDev::old_video_mode(-1), FBDev::video_mode(-1);
++#endif
++#endif
+ //colormap
+ __u16 FBDev::red16[] = {
+ 0x0000, 0x0000, 0x0000, 0x0000, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa,
+@@ -63,10 +70,8 @@
+ #if defined(linux)
+     #include <linux/fb.h>
+     #define MAX_DEV_LEN 63
+-#endif
+ OPEN_RC FBDev::TryOpen() {
+     OPEN_RC rc = NORMAL;
+-#if defined(linux)
+     char devname[MAX_DEV_LEN+1];
+     int fbNo;
+     // Find a framebuffer to open
+@@ -127,9 +132,9 @@
+     if (mpBuf == MAP_FAILED)
+         throw(runtime_error("fb device mmap failed!"));
+     mNextLine = Finfo.line_length;
+-#endif
+     return rc;
+ }
++#endif
+ 
+ OPEN_RC FBDev::LinearSet( struct fb_var_screeninfo &Vinfo ) {
+     OPEN_RC rc = NORMAL;
+@@ -180,15 +185,13 @@
+     #include <sys/consio.h>
+     #include <sys/fbio.h>
+     #include <machine/sysarch.h>
+-#endif
+ bool FBDev::TryOpen(int xres, int yres, int depth) {
+-#if defined(__FreeBSD__)
++#if defined(OLD_FREEBSD_MODE)
+     video_info_t mode = {0};
+     mode.vi_width = xres;
+     mode.vi_height = yres;
+     mode.vi_depth = depth;
+     if (ioctl(0, FBIO_FINDMODE, &mode)) {
+-        return false;
+         throw(runtime_error("Cannot find graphics mode. Check your zhcon.conf please.\n"));
+     }
+     if ((mode.vi_mode >= M_B40x25) && (mode.vi_mode <= M_VGA_M90x60))
+@@ -209,7 +212,7 @@
+ 
+     mXres = mode.vi_width;
+     mYres = mode.vi_height;
+-    mpBufLen = mode.vi_buffer_size;
++    mpBufLen = mode.vi_window_size;
+     if (mode.vi_mem_model == V_INFO_MM_PLANAR) {
+         mpBufLen = mode.vi_width * mode.vi_height / 8;
+     }
+@@ -223,8 +226,51 @@
+ //#endif
+         throw(runtime_error("Can not open vga device.\n"));
+     }
++    // undefine mNextLine, checked by low level
++#else
++	if (0 > ioctl(1, FBIO_GETMODE, &old_video_mode)) {
++        throw(runtime_error("Cannot obtain current video mode.\n"));
++    }
++	std::vector<video_info_t> mode_infos;
++	for (int mode_number(0); mode_number <= M_VESA_MODE_MAX; ++mode_number) {
++		video_info_t mi;
++		mi.vi_mode = mode_number;
++		if (0 > ioctl(1, FBIO_MODEINFO, &mi)) continue;
++        if (mi.vi_window_size & 4095) continue; // Skip modes that cannot be memory mapped fully because of an OBOE in the kernel.
++		mode_infos.push_back(mi);
++	}
++    video_info_t mode = {};
++    video_mode = -1;
++	for (std::vector<video_info_t>::const_iterator mi(mode_infos.begin()), me(mode_infos.end()); mi != me; ++mi) {
++		if (depth != mi->vi_depth) continue;
++		if (xres != mi->vi_width) continue;
++		if (yres != mi->vi_height) continue;
++		if ((V_INFO_GRAPHICS|V_INFO_LINEAR) != (mi->vi_flags & (V_INFO_GRAPHICS|V_INFO_LINEAR))) continue;
++        if (mi->vi_buffer_size & 4095) continue;    // FreeBSD doesn't account for a partial last page causing EINVAL from mmap().
++		mode = *mi;
++        video_mode = mi->vi_mode;
++	}
++	if (0 > video_mode) {
++        throw(runtime_error("Cannot find graphics mode. Check your zhcon.conf please.\n"));
++	}
++	if (0 > ioctl(1, FBIO_SETMODE, &video_mode)) {
++        throw(runtime_error("Cannot switch to graphics mode. Refer to README/FAQ and check your zhcon.cfg please!\n"));
++    }
++    video_adapter_info_t adapter_info;
++	if (0 > ioctl(1, FBIO_ADPINFO, &adapter_info)) {
++        throw(runtime_error("Cannot obtain information about graphics mode. Refer to README/FAQ and check your zhcon.cfg please!\n"));
++    }
++    mXres = mode.vi_width;
++    mYres = mode.vi_height;
++    mpBufLen = adapter_info.va_window_size;
++    mNextLine = adapter_info.va_line_width;
++
++    if ((mFd = dup(1)) < 0) {
++        throw(runtime_error("Can not open tty device for framebuffer.\n"));
++    }
++#endif
+ 
+-    switch (depth) {
++    switch (mode.vi_depth) {
+         case 4:
+ #ifdef USING_VGA
+             mpGraphDev = new FBVgaPlanes;
+@@ -252,6 +298,7 @@
+             throw(runtime_error("color depth unsupported in this version\n"
+                 "use 8bpp instead!"));
+     }
++#if defined(OLD_FREEBSD_MODE)
+ //#if (__FreeBSD__ <= 3)
+ #define GRAPH_BASE 0x0
+ //#else
+@@ -259,14 +306,17 @@
+ //#endif
+     mpBuf = static_cast<char *>(mmap(0, mpBufLen, PROT_READ | PROT_WRITE,
+             MAP_FILE|MAP_SHARED|MAP_FIXED, mFd, GRAPH_BASE));
++#else
++    mpBuf = static_cast<char *>(mmap(0, mpBufLen, PROT_READ | PROT_WRITE,
++            MAP_SHARED, mFd, 0));
++#endif
+ 
+     if (mpBuf == MAP_FAILED)
+         throw(runtime_error("mmap() failed!"));
+ 
+-    // undefine mNextLine, checked by low level
+-#endif
+     return true;
+ }
++#endif
+ 
+ FBDev::~FBDev() {
+     if (mpBuf != NULL)
+@@ -274,21 +324,33 @@
+     if (mFd >= 0)
+         close(mFd);
+ #if defined(__FreeBSD__)
+-    ioctl(0, SW_TEXT_80x25, 0);
++#if defined(OLD_FREEBSD_MODE)
++    ioctl(1, SW_TEXT_80x25, 0);
++#else
++	ioctl(1, FBIO_SETMODE, &old_video_mode);
++#endif
+ #endif
+ }
+ 
+ void FBDev::SwitchToGraph() {
+ #if defined(__FreeBSD__)
++#if defined(OLD_FREEBSD_MODE)
+     if (mCurrentMode == 0)
+         return;
+-    ioctl(0, mCurrentMode, 0);
++    ioctl(1, mCurrentMode, 0);
++#else
++	ioctl(1, FBIO_SETMODE, &video_mode);
++#endif
+ #endif
+ }
+ 
+ void FBDev::SwitchToText() {
+ #if defined(__FreeBSD__)
+-    ioctl(0, SW_TEXT_80x25, 0);
++#if defined(OLD_FREEBSD_MODE)
++    ioctl(1, SW_TEXT_80x25, 0);
++#else
++	ioctl(1, FBIO_SETMODE, &old_video_mode);
++#endif
+ #endif
+ }
+ 

@@ -1,0 +1,12 @@
+--- ./src/display/fblinear15.cpp.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/display/fblinear15.cpp	2023-05-21 18:16:15.444700131 +0100
+@@ -23,7 +23,9 @@
+ 
+ FBLinear15::FBLinear15() {
+     InitColorMap();
++#if defined(OLD_FREEBSD_MODE)
+     mNextLine = mNextLine ? mNextLine : mXres<<1;
++#endif
+ }
+ 
+ void FBLinear15::InitColorMap() {

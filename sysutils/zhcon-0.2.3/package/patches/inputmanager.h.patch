@@ -1,0 +1,11 @@
+--- ./src/inputmanager.h.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/inputmanager.h	2023-05-21 10:32:03.115618367 +0100
+@@ -36,7 +36,7 @@
+ class Console;
+ class InputServer;
+ class InputClient;
+-class ImmInfo;
++struct ImmInfo;
+ class ConfigFile;
+ class Window;
+ 

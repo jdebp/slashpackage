@@ -1,0 +1,55 @@
+--- ./src/graphdev.cpp.orig	2003-04-17 12:28:03.000000000 +0100
++++ ./src/graphdev.cpp	2023-05-21 13:45:40.567519549 +0100
+@@ -26,6 +26,7 @@
+ #include <sys/mman.h>
+ #include <assert.h>
+ #include "debug.h"
++#include <cstdlib>
+ 
+ #include "display/fbdev.h"
+ #include "display/vgadev.h"
+@@ -50,6 +51,7 @@
+ struct CharBitMap GraphDev::mAsc = {0};
+ struct CharBitMap GraphDev::mDbl = {0};
+ 
++#if defined(linux)
+ bool GraphDev::Open() {
+ #ifdef HAVE_GGI_LIB
+     #ifndef NDEBUG
+@@ -79,22 +81,23 @@
+ #endif
+             //libggi failed,now try vga
+         case FAILURE:
+-#if defined(linux)
+ #ifdef USING_VGA
+             if (VGADev::TryOpen())
+                 return true;
+             break;
+ #endif
+-#endif
+         default:  // vga fail
+             return false;
+     }
+     return false;
+ }
++#endif
+ 
++#if defined(__FreeBSD__)
+ bool GraphDev::Open(int xres, int yres, int depth) {
+     return FBDev::TryOpen(xres, yres, depth);
+ }
++#endif
+ 
+ void GraphDev::Close() {
+     if (mpGraphDev)
+@@ -115,8 +118,8 @@
+     assert( x2 >= 0 && x2 < Width() && y2 >=0 && y2 < Height());
+     int dx = x2 - x1;
+     int dy = y2 - y1;
+-    int ax = abs(dx) << 1;
+-    int ay = abs(dy) << 1;
++    int ax = std::abs(dx) << 1;
++    int ay = std::abs(dy) << 1;
+     int sx = (dx >= 0) ? 1 : -1;
+     int sy = (dy >= 0) ? 1 : -1;
+ 

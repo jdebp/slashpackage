@@ -1,0 +1,19 @@
+--- ./src/inputmanager.cpp.orig	2003-04-13 04:41:35.000000000 +0100
++++ ./src/inputmanager.cpp	2023-05-21 10:32:03.114620035 +0100
+@@ -406,7 +406,6 @@
+     ImmInfo t;
+     string s;
+     unsigned int ParmNo, Pos;
+-    unsigned int NextPos;
+     string sVal;
+     vector < string > v;
+     f.GetOptions(string("ime"), v);
+@@ -415,7 +414,7 @@
+         ParmNo = 0;
+         Pos = 0;
+         while ( Pos < s.length() ) {
+-            NextPos = s.find(',', Pos);
++            string::size_type NextPos = s.find(',', Pos);
+             if (NextPos == string::npos)
+                 NextPos = s.length();
+             sVal = s.substr(Pos, NextPos - Pos);

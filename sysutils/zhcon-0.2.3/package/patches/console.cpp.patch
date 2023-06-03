@@ -1,0 +1,30 @@
+--- ./src/console.cpp.orig	2003-01-23 13:14:52.000000000 +0000
++++ ./src/console.cpp	2023-05-21 19:18:34.454442233 +0100
+@@ -563,8 +563,8 @@
+             //del(currcons);
+             return;
+         case 128 + 27:
++            mEscIntro = c;
+             mEscState = SQUARE;
+-            assert(!"128+27");
+             return;
+         default:
+             break;//assert(!"unknown control char reached!");
+@@ -752,7 +752,7 @@
+     switch (mEscParam[0]) {
+         /* DEC private modes set/reset */
+         case 1:                        /* Cursor keys send ^[Ox/^[[x */
+-            assert(!"set_dec_cursor_keys(tty, on_off)");
++            std::fprintf(stderr, "set_dec_cursor_keys(tty, on_off)");
+             break;
+         case 3:                        /* 80/132 mode switch unimplemented */
+             break;
+@@ -786,7 +786,7 @@
+             break;
+         case 20:                       /* Lf, Enter == CrLf/Lf */
+             //          set_lf_mode(tty, on_off);
+-            assert(!"Lf, Enter == CrLf/Lf");
++            std::fprintf(stderr, "Lf, Enter == CrLf/Lf");
+             break;
+     }
+ }

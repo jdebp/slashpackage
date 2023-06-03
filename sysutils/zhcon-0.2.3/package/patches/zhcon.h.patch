@@ -1,0 +1,20 @@
+--- ./src/zhcon.h.orig	2003-04-21 14:32:46.000000000 +0100
++++ ./src/zhcon.h	2023-05-21 14:38:32.707200562 +0100
+@@ -70,6 +70,8 @@
+         void InstallSignal();
+         void CleanUp();
+ 
++        string ConfigFileName();
++        string ShareDirName();
+         void InitTty();
+         static char  mCapBuf[512];
+         static char* mpCapClearScr;
+@@ -123,7 +125,7 @@
+         string mOldLocale;
+         enum AutoEncodeType {AUTO,AUTO_GB,AUTO_BIG5,MANUAL};
+         AutoEncodeType mAutoEncode;
+-        static char* mpTips[];
++        static const char* mpTips[];
+         bool mShowTips;
+         int mArgc;
+         char** mArgv;

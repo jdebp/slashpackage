@@ -1,0 +1,20 @@
+--- ./src/winime.cpp.orig	2002-05-12 04:58:27.000000000 +0100
++++ ./src/winime.cpp	2023-05-21 10:32:03.122618348 +0100
+@@ -250,7 +250,7 @@
+ 
+         if (p == (char *) 0xffffffff)
+             found = false;
+-        p = (unsigned int) p + mpText;
++        p = reinterpret_cast<uintptr_t>(p) + mpText;
+     } //2nd level index
+     else if (mNum == 1) {
+         int l = strlen(mHead.mCodeSet);
+@@ -271,7 +271,7 @@
+         if (p == (char *) 0xffffffff)
+             found = false;
+ 
+-        p = (unsigned int) p + mpText;
++        p = reinterpret_cast<uintptr_t>(p) + mpText;
+     } else if (mNum < mHead.mMaxCodes) {
+         p = mpOffset[mNum - 1];
+         if (p == (char *) 0xffffffff)

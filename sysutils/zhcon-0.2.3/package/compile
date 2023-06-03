@@ -1,0 +1,219 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+name='zhcon'
+version='0.2.3'
+
+if test -d ../"${name}.git"
+then
+	# Create and checkout the source directory
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		rm -f -- source/.git
+		ln -f -s -- ../../"${name}.git" source/.git
+		( cd source && git checkout -f "${version}" )
+		# Apply our patches
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -i ../"${patchfile}"
+		done
+	fi
+else
+	# Download the source
+	if test \! -d dist/"${name}-${version}"
+	then
+		install -d -m 0755 dist
+		case "`uname`" in
+		Linux) fetch=wget ; FETCHARGS= ;;
+		OpenBSD) fetch=ftp ; FETCHARGS= ;;
+		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		esac
+		extension='.tar.gz'
+		url='http://downloads.sourceforge.net/project/'"${name}/${name}/${version}/${name}-${version}${extension}"
+		SHA256='60e2f7a3b2a548e043838794b7ab3cb0e84f13508d48b384e9b6598698baacbb'
+		SIZE='5030677'
+		archive="${name}-${version}${extension}" 
+		( 
+			cd dist 
+			"${fetch}" -o "${archive}" "${url}"
+			sha256 -c "${SHA256}" "${archive}"
+			pax -r -z < "${archive}"
+		)
+		rm -r -f -- source
+	fi
+
+	# Create and populate the source directory
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
+		# Apply our patches
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -i ../"${patchfile}"
+		done
+	fi
+fi
+
+export CDPATH=
+
+# Create and populate the build directory.
+install -d -m 0755 build
+( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	case "`uname`" in
+	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
+	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
+	esac
+	if > /dev/null expr "${cpus}" '>' 4
+	then
+		cpus=4
+	fi
+fi
+(
+	cd build
+	test -r config.status || sh ./configure --disable-nls
+	make ${cpus:+ -j "${cpus}"} -k
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual config config/locale config/share config/share/font
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		rm -f -- command/"$i"{new}
+		if objdump -f build/src/"$i" >/dev/null 2>&1
+		then
+			install -m 0755 -p -- build/src/"$i" command/"$i"{new}
+			strip -p -- command/"$i"{new}
+			chmod 0555 command/"$i"{new}
+		else
+			install -m 0555 -p -- build/src/"$i" command/"$i"{new}
+		fi
+	done
+	# All of the aliases for other commands
+	test -r package/aliases${section} && cat package/aliases${section} |
+	while read -r command alias
+	do
+		rm -f -- command/"${alias}"{new}
+		ln -f -- command/"${command}"{new} command/"${alias}"{new}
+	done
+	# All of the commands that have their own manual pages
+	(
+		test -r package/commands${section} && cat package/commands${section}
+		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
+	) |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section}
+		rm -f -- manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/doc/"$i".${section} manual/man${section}/"$i".${section}{new}
+	done
+	# All of the manual pages for aliases
+	test -r package/aliases${section} && cat package/aliases${section} |
+	while read -r command alias
+	do
+		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
+		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
+		ln -f -s -- "${command}".${section} manual/man${section}/"${alias}".${section}{new}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for directory in en_GB.UTF-8 en.UTF-8
+do
+	rm -f -- manual/"${directory}"{new}
+	ln -f -s -- . manual/"${directory}"{new}
+done
+
+# ##############################################################################
+# Rename the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables and all of their aliases
+	(
+		test -r package/commands${section} && cat package/commands${section}
+		test -r package/aliases${section} && awk '{print $2;}' package/aliases${section}
+	) |
+	while read -r i
+	do
+		mv -f -- command/"$i"{new} command/"$i"
+	done
+	# All of the commands that have their own manual pages
+	(
+		test -r package/commands${section} && cat package/commands${section}
+		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
+	) |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+	done
+	# All of the manual pages for aliases
+	test -r package/aliases${section} && cat package/aliases${section} |
+	while read -r command alias
+	do
+		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
+		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
+		mv -f -- manual/man${section}/"${alias}".${section}{new} manual/man${section}/"${alias}".${section}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for directory in en_GB.UTF-8 en.UTF-8
+do
+	test -e manual/"${directory}" && mv -f -- manual/"${directory}" manual/"${directory}"{old}
+	mv -f -- manual/"${directory}"{new} manual/"${directory}"
+	rm -f -- manual/"${directory}"{old}
+done
+
+# ##############################################################################
+# Build all of the ...{new} files in ./config.
+find build/po -name '*.mo' |
+while read -r mo
+do
+	i="`basename \"${mo}\" .mo`"
+	install -d -m 0755 -- config/locale/"$i"/LC_MESSAGES
+	rm -f -- config/locale/"$i"/LC_MESSAGES/yash.mo{new}
+	install -m 0444 -p -- "${mo}" config/locale/"$i"/LC_MESSAGES/yash.mo{new}
+done
+find build/font -name '*.bpsf' |
+while read -r font
+do
+	i="`basename \"${font}\"`"
+	rm -f -- config/share/font/"$i"{new}
+	install -m 0444 -p -- "${font}" config/share/font/"$i"{new}
+done
+
+# ##############################################################################
+# Rename the ...{new} directories and files in ./config.
+find build/po -name '*.mo' |
+while read -r mo
+do
+	i="`basename \"${mo}\" .mo`"
+	mv -f -- config/locale/"$i"/LC_MESSAGES/yash.mo{new} config/locale/"$i"/LC_MESSAGES/yash.mo
+done
+find build/font -name '*.bpsf' |
+while read -r font
+do
+	i="`basename \"${font}\"`"
+	mv -f -- config/share/font/"$i"{new} config/share/font/"$i"
+done

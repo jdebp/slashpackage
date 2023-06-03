@@ -1,0 +1,28 @@
+--- ./src/graphdev.h.orig	2002-05-12 04:58:27.000000000 +0100
++++ ./src/graphdev.h	2023-05-21 13:41:21.240230015 +0100
+@@ -42,8 +42,11 @@
+ 
+ class GraphDev {
+     public:
++#if defined(linux)
+         static bool Open();
++#elif defined(__FreeBSD__)
+         static bool Open(int xres, int yres, int depth);
++#endif
+         static void Close();
+         virtual ~GraphDev() {};
+ 
+@@ -94,11 +97,7 @@
+         static struct CharBitMap mDbl;
+ };
+ 
+-#define fb_readb(addr) (*(volatile __u8 *) (addr))
+-#define fb_readw(addr) (*(volatile __u16 *) (addr))
+-#define fb_readl(addr) (*(volatile __u32 *) (addr))
+-#define fb_writeb(b,addr) (*(volatile __u8 *) (addr) = (b))
+-#define fb_writew(b,addr) (*(volatile __u16 *) (addr) = (b))
+-#define fb_writel(b,addr) (*(volatile __u32 *) (addr) = (b))
++template<typename U> inline U fb_read(volatile U *addr) { return *addr; }
++template<typename U, typename T> inline void fb_write(T b, volatile U *addr) { *addr = static_cast<U>(b); }
+ 
+ #endif

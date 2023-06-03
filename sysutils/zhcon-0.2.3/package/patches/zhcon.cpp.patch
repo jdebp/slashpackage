@@ -1,0 +1,163 @@
+--- ./src/zhcon.cpp.orig	2003-04-21 14:42:31.000000000 +0100
++++ ./src/zhcon.cpp	2023-05-21 19:11:18.026545092 +0100
+@@ -47,6 +47,7 @@
+ #include <stdexcept>
+ #include <algorithm>
+ #include <locale.h>
++#include <paths.h>
+ 
+ #include "global.h"
+ #include "console.h"
+@@ -85,7 +86,7 @@
+ int Zhcon::mTtyPid = 0;
+ Zhcon::STATE Zhcon::mState = STOP;
+ 
+-char* Zhcon::mpTips[] = {
++const char* Zhcon::mpTips[] = {
+ gettext_noop("Please visit zhcon.gnuchina.org for more information."),
+ gettext_noop("Zhcon supports GB2312,GBK,BIG5,JIS,KSC encode."),
+ gettext_noop("You can use CTRL-ALT-0 to toggle prompt bar."),
+@@ -125,12 +126,54 @@
+     Zhcon::mpZhcon = NULL;
+ }
+ 
++string Zhcon::ConfigFileName() {
++    string cfgfile;
++    const char *cfgdir = getenv("XDG_CONFIG_DIR");
++    if (cfgdir) {
++        cfgfile = string(cfgdir) + "/zhconrc";
++        if (access(cfgfile.c_str(), R_OK) == 0)
++            return cfgfile;
++    }
++    const char *home = getenv("HOME");
++    if (home) {
++        cfgfile = string(home) + "/.config/zhconrc";
++        if (access(cfgfile.c_str(), R_OK) == 0)
++            return cfgfile;
++        cfgfile = string(home) + "/.zhconrc";
++        if (access(cfgfile.c_str(), R_OK) == 0)
++            return cfgfile;
++    }
++    cfgfile = "/usr/local/etc/zhcon.conf";
++    if (access(cfgfile.c_str(), R_OK) == 0)
++        return cfgfile;
++    return "/etc/zhcon.conf";
++}
++
++string Zhcon::ShareDirName() {
++    string sharedir;
++    const char *datadir = getenv("XDG_DATA_DIR");
++    if (datadir) {
++        sharedir = string(datadir) + "/zhcon/";
++        if (access(sharedir.c_str(), R_OK) == 0)
++            return sharedir;
++    }
++    const char *home = getenv("HOME");
++    if (home) {
++        sharedir = string(home) + "/.local/share/zhcon/";
++        if (access(sharedir.c_str(), R_OK) == 0)
++            return sharedir;
++    }
++    sharedir = "/usr/local/share/zhcon/";
++    if (access(sharedir.c_str(), R_OK) == 0)
++        return sharedir;
++    sharedir = "/usr/share/zhcon/";
++    if (access(sharedir.c_str(), R_OK) == 0)
++        return sharedir;
++    return PREFIX"/lib/zhcon/";
++}
+ void Zhcon::Init() {
+     //reading config file
+-    string cfgfile = getenv("HOME");
+-    cfgfile += "/.zhconrc";
+-    if (access(cfgfile.c_str(), R_OK) != 0)
+-        cfgfile = "/etc/zhcon.conf";
++    string cfgfile(ConfigFileName());
+ 
+     //for debug,a pause enable us to attach zhcon's pid in gdb
+     //char c;cin>>c;
+@@ -252,10 +295,18 @@
+     ioctl(0, TIOCSCTTY, 0);
+     if (mTtyPid == 0) {
+         //child
+-        struct passwd *userpd;
+-
+-        if ((userpd = getpwuid(getuid())) == NULL)
+-            throw runtime_error("can not get user's shell!");
++        const char * shell = getenv("SHELL");
++        if (!shell) {
++            struct passwd *userpd;
++
++            if ((userpd = getpwuid(getuid())) == NULL)
++                throw runtime_error("can not get user's shell!");
++            shell = userpd->pw_shell;
++            if (!shell || !*shell)
++                shell = _PATH_BSHELL;
++        }
++        const char *TtyName = ttyname(fileno(stdout));
++        setenv("TTY", TtyName, 1);
+ 
+         /* close all opened file */
+ #ifndef OPEN_MAX
+@@ -270,7 +321,7 @@
+         if (mArgc > 1)
+             execvp(mArgv[1], &mArgv[1]);
+         else
+-            execlp(userpd->pw_shell, userpd->pw_shell, (char *) 0);
++            execlp(shell, shell, (char *) 0);
+         exit(-1);
+     }
+ }
+@@ -361,21 +412,23 @@
+ void Zhcon::InitTty() {
+     // Using throw cause core dump when call destruct
+     if (!isatty(fileno(stdout))) {
+-        printf("This is an interactive api, don't redirect stdout.\r\n");
++        std::fprintf(stderr, "This is an interactive api, don't redirect stdout.\r\n");
+         exit(1);
+     }
+ 
+     char *TtyName = ttyname(fileno(stdout));
+     if (!TtyName) {
+-        printf("Can not get current tty name.\r\n");
++        std::fprintf(stderr, "Can not get current tty name.\r\n");
+         exit(1);
+     }
++    std::fprintf(stderr, "%s is tty name.\r\n", TtyName);
+     
+     if (!(strncmp("/dev/tty", TtyName, 8) == 0 ||
+         strncmp("/dev/vc/", TtyName, 8) == 0)) {
+-        printf("%s is not real tty or vc. Please exit current tty and try again.\r\n", TtyName);
++        std::fprintf(stderr, "%s is not real tty or vc. Please exit current tty and try again.\r\n", TtyName);
+         exit(1);
+     }
++    std::fprintf(stderr, "%s is real tty or vc.\r\n", TtyName);
+     
+     mConFd = open(TtyName, O_RDWR);
+     if (mConFd == -1)
+@@ -530,6 +583,7 @@
+ void Zhcon::VtSignalSet(int mode)
+ {
+     //return; for debug
++    if (mConFd < 0) return;
+     vt_mode vtm;
+     if (ioctl(mConFd, VT_GETMODE, &vtm))
+         throw runtime_error("ioctl VT_GETMODE failed!");
+@@ -605,7 +659,7 @@
+     if (getenv("LC_ALL"))
+         mOldLocale = getenv("LC_ALL");
+ 
+-    string prefix = PREFIX"/lib/zhcon/";
++    string prefix(ShareDirName());
+     mASCIIFont = prefix + f.GetOption(string("ascfont"), string(ASCIIFONT));
+     mGB2312Font = prefix + f.GetOption(string("gbfont"), string(GB2312FONT));
+     mGBKFont = prefix + f.GetOption(string("gbkfont"), string(GBKFONT));
+@@ -667,7 +721,7 @@
+ #elif defined(__FreeBSD__)
+     int xres = f.GetOption(string("x_resolution"), 640);
+     int yres = f.GetOption(string("y_resolution"), 480);
+-    int depth = f.GetOption(string("color_depth"), 4);
++    int depth = f.GetOption(string("color_depth"), 32);
+     r = GraphDev::Open(xres, yres, depth);
+ #endif
+     if (!r)

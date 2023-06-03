@@ -1,0 +1,11 @@
+--- ./src/debug.h.orig	2002-05-18 15:13:58.000000000 +0100
++++ ./src/debug.h	2023-05-21 10:55:03.692002558 +0100
+@@ -20,7 +20,7 @@
+ 
+ #ifndef NDEBUG
+ #include <fstream>
+-extern ofstream debug;
++extern std::ofstream debug;
+ #endif
+ 
+ #endif

@@ -1,0 +1,22 @@
+--- ./configure.orig	2003-04-13 09:47:49.000000000 +0100
++++ ./configure	2023-05-21 11:06:05.586478552 +0100
+@@ -1666,7 +1666,7 @@
+ *-*-linux*)
+       echo "Linux detected"
+       ZHCON_ARCH="Linux";;
+-i?86-*-freebsd*)
++i?86-*-freebsd*|amd64-*-freebsd*)
+       echo "FreeBsd detected"
+       ZHCON_ARCH="FreeBSD"
+                         LIBS="-L/usr/local/lib $LIBS"
+@@ -1691,8 +1691,8 @@
+      fi
+ fi;
+ 
+-CFLAGS="$CFLAGS -funsigned-char"
+-CXXFLAGS="$CXXFLAGS -funsigned-char"
++CFLAGS="$CFLAGS -funsigned-char -fcxx-exceptions"
++CXXFLAGS="$CXXFLAGS -funsigned-char -fcxx-exceptions"
+ if test $enable_debug = 'yes';then
+         CFLAGS="$CFLAGS -O0 -g3 -Wall"
+         CXXFLAGS="$CXXFLAGS -O0 -g3 -Wall"

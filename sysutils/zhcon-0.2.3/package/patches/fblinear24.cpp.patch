@@ -1,0 +1,152 @@
+--- ./src/display/fblinear24.cpp.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/display/fblinear24.cpp	2023-05-21 18:16:44.001962042 +0100
+@@ -24,7 +24,9 @@
+ 
+ FBLinear24::FBLinear24() {
+     InitColorMap();
++#if defined(OLD_FREEBSD_MODE)
+     mNextLine = mNextLine ? mNextLine : mXres*3;
++#endif
+ }
+ 
+ void FBLinear24::InitColorMap() {
+@@ -50,9 +52,9 @@
+ inline void FBLinear24::store4pixels(__u32 d1, __u32 d2, __u32 d3, __u32 d4, __u32 *dest) {
+     __u32 o1, o2, o3;
+     convert4to3(d1, d2, d3, d4, o1, o2, o3);
+-    fb_writel (o1, dest++);
+-    fb_writel (o2, dest++);
+-    fb_writel (o3, dest++);
++    fb_write (o1, dest++);
++    fb_write (o2, dest++);
++    fb_write (o3, dest++);
+ }
+ 
+ void FBLinear24::FillRect(int x1,int y1,int x2,int y2,int color) {
+@@ -77,16 +79,16 @@
+             dest32 += 3;
+         }
+         if (width & 2) {
+-            fb_writel(fgx | fgx<<24, dest32++);
++            fb_write(fgx | fgx<<24, dest32++);
+             dest16 = (__u16*)dest32;
+-            fb_writew(fgx>>8, dest16++);
++            fb_write(fgx>>8, dest16++);
+             dest32 = (__u32*)dest16;
+         }
+         if (width & 1) {
+             dest16 = (__u16*)dest32;
+-            fb_writew(fgx, dest16++);
++            fb_write(fgx, dest16++);
+             dest8 = (__u8*)dest16;
+-            fb_writeb(fgx>>16, dest8);
++            fb_write(fgx>>16, dest8);
+         }
+     }
+     /* base on ole, more simple
+@@ -101,9 +103,9 @@
+     for(; height > 0; height--, dest += mNextLine) {
+         p = dest;
+         for(col = width; col > 0; col--) {
+-            fb_writeb(color0, p++);
+-            fb_writeb(color1, p++);
+-            fb_writeb(color2, p++);
++            fb_write(color0, p++);
++            fb_write(color1, p++);
++            fb_write(color2, p++);
+         }
+     }
+     */
+@@ -124,28 +126,31 @@
+     for(; height--; dest += mNextLine) {
+         dest32 = (__u32*)dest;
+         for (cnt = width/4; cnt--;) {
+-            fb_writel(fb_readl(dest32) ^ 0xffffffff, dest32++);
+-            fb_writel(fb_readl(dest32) ^ 0xffffffff, dest32++);
+-            fb_writel(fb_readl(dest32) ^ 0xffffffff, dest32++);
++            fb_write(fb_read(dest32) ^ 0xffffffff, dest32);
++            ++dest32;
++            fb_write(fb_read(dest32) ^ 0xffffffff, dest32);
++            ++dest32;
++            fb_write(fb_read(dest32) ^ 0xffffffff, dest32);
++            ++dest32;
+         }
+         if (width & 2) {
+-            fb_writel(fb_readl(dest32) ^ 0xffffffff, dest32++);
+-            dest16 = (__u16*)dest32;
+-            fb_writew(fb_readw(dest16) ^ 0xffff, dest16++);
+-            dest32 = (__u32*)dest16;
++            fb_write(fb_read(dest32) ^ 0xffffffff, dest32);
++            dest16 = (__u16*)++dest32;
++            fb_write(fb_read(dest16) ^ 0xffff, dest16);
++            dest32 = (__u32*)++dest16;
+         }
+         if (width & 1) {
+             dest16 = (__u16*)dest32;
+-            fb_writew(fb_readw(dest16) ^ 0xffff, dest16++);
+-            dest8 = (__u8*)dest16;
+-            fb_writeb(fb_readb(dest8) ^ 0xff, dest8);
++            fb_write(fb_read(dest16) ^ 0xffff, dest16);
++            dest8 = (__u8*)++dest16;
++            fb_write(fb_read(dest8) ^ 0xff, dest8);
+         }
+     }
+     /* more simple
+     for(; height--; dest += mNextLine) {
+         dest8 = (__u8*)dest;
+         for (cnt = width * 3; cnt--;) {
+-            fb_writeb(fb_readb(dest8) ^ 0xff, dest8++);
++            fb_write(fb_read(dest8) ^ 0xff, dest8++);
+         }
+     }
+     */
+@@ -154,8 +159,8 @@
+ inline void FBLinear24::PutPixel(int x,int y,int color) {
+     assert( x >= 0 && x < mXres && y >=0 && y < mYres);
+     __u8* dest = ((__u8*)mpBuf + mNextLine * y + x * 3);
+-    fb_writew( (cfb24[color]<<8) & (cfb24[color]>>8), dest);
+-    fb_writeb( cfb24[color]>>16, dest + 2);
++    fb_write( (cfb24[color]<<8) & (cfb24[color]>>8), (__u16*)dest);
++    fb_write( cfb24[color]>>16, dest + 2);
+ }
+ 
+ void FBLinear24::DrawChar(int x,int y,int fg,int bg,struct CharBitMap* pFont) {
+@@ -165,13 +170,12 @@
+     eorx = fgx ^ bgx;
+ 
+     __u8* dest = ((__u8*)mpBuf + mNextLine * y + x * 3 );
+-    __u32* dest32;
+ 
+     char* cdat = pFont->pBuf;
+     int cnt;
+     int row;
+     for (row = mBlockHeight; row-- ; dest += mNextLine) {
+-        dest32 = (__u32*)dest;
++        __u32* dest32 = (__u32*)dest;
+         for (cnt = (pFont->w)/8; cnt--;) {
+             d1 = (-(*cdat >> 7) & eorx) ^ bgx;
+             d2 = (-(*cdat >> 6 & 1) & eorx) ^ bgx;
+@@ -202,13 +206,19 @@
+         if (pFont->w & 2) {
+             d1 = (-(*cdat >> 3 & 1) & eorx) ^ bgx;
+             d2 = (-(*cdat >> 2 & 1) & eorx) ^ bgx;
+-            fb_writel(d1 | (d2<<24), dest32++);
+-            fb_writew(d2>>8, ((__u16*)dest32)++);
++            fb_write(d1 | (d2<<24), dest32++);
++            __u16* dest16 = reinterpret_cast<__u16*>(dest32);
++            fb_write(d2>>8, dest16);
++            dest32 = reinterpret_cast<__u32*>(++dest16);
+         }
+         if (pFont->w & 1) {
+             d3 = (-(*cdat >> 1 & 1) & eorx) ^ bgx;
+-            fb_writew(d3, ((__u16*)dest32)++);
+-            fb_writeb(d3>>16, (__u8*)dest32);
++            __u16* dest16 = reinterpret_cast<__u16*>(dest32);
++            fb_write(d3, dest16);
++            dest32 = reinterpret_cast<__u32*>(++dest16);
++            __u8* dest8 = reinterpret_cast<__u8*>(dest32);
++            fb_write(d3>>16, dest8);
++            dest32 = reinterpret_cast<__u32*>(++dest8);
+         }
+         cdat++;
+     }

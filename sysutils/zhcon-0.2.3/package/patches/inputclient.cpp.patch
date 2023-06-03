@@ -1,0 +1,32 @@
+--- ./src/inputclient.cpp.orig	2002-05-12 04:58:27.000000000 +0100
++++ ./src/inputclient.cpp	2023-05-21 10:32:03.110618735 +0100
+@@ -17,6 +17,7 @@
+  ***************************************************************************/
+ 
+ #include "inputclient.h"
++#include <cstdlib>
+ 
+ Console* InputClient::mpCon = NULL;
+ InputClient::InputClient()
+@@ -29,19 +30,18 @@
+ 
+ void InputClient::SetColor(string & s) {
+     unsigned int ParmNo, Pos;
+-    unsigned int NextPos;
+     int iVal;
+     string sVal;
+     // debug << "inputcolor define " << s << endl;
+     ParmNo = 0;
+     Pos = 0;
+     while ( Pos < s.length() ) {
+-        NextPos = s.find(',', Pos);
++        string::size_type NextPos = s.find(',', Pos);
+         if (NextPos == string::npos)
+             NextPos = s.length();
+         sVal = s.substr(Pos,NextPos - Pos);
+         // debug << atoi(sVal.c_str()) << endl;
+-        iVal = atoi(sVal.c_str());
++        iVal = std::atoi(sVal.c_str());
+         iVal %= 16;
+         switch (ParmNo) {
+             case 0:

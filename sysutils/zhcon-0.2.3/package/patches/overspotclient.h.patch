@@ -1,0 +1,11 @@
+--- ./src/overspotclient.h.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/overspotclient.h	2023-05-21 10:32:03.120618808 +0100
+@@ -26,7 +26,7 @@
+   *@author ejoy
+   */
+ 
+-class Candilist;
++struct Candilist;
+ 
+ class OverSpotClient : public Window,public InputClient {
+     public:

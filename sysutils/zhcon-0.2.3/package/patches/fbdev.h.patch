@@ -1,0 +1,32 @@
+--- ./src/display/fbdev.h.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/display/fbdev.h	2023-05-21 13:41:21.217836747 +0100
+@@ -26,10 +26,13 @@
+ class FBDev : public GraphDev  {
+     public:
+         virtual ~FBDev();
++#if defined(linux)
+         // graphic
+         static OPEN_RC TryOpen();
++#elif defined(__FreeBSD__)
+         // for FreeBSD
+         static bool TryOpen(int xres, int yres, int depth);
++#endif
+ 
+         virtual void PutPixel(int x,int y,int color) = 0;
+         virtual void FillRect(int x1,int y1,int x2,int y2,int color) = 0;
+@@ -41,7 +44,14 @@
+     private:
+         static OPEN_RC LinearSet( struct fb_var_screeninfo &Vinfo );
+         static void VGAPlaneSet( void );
+-        static int mCurrentMode;  // for FreeBSD
++#if defined(__FreeBSD__)
++#if defined(OLD_FREEBSD_MODE)
++        static int mCurrentMode;
++#else
++        static int old_video_mode;
++        static int video_mode;
++#endif
++#endif
+ 
+     protected:
+         // mmap framebuffer address

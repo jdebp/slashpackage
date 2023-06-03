@@ -1,0 +1,10 @@
+--- ./src/mouse.cpp.orig	2002-05-27 03:51:02.000000000 +0100
++++ ./src/mouse.cpp	2023-05-21 10:32:03.117618696 +0100
+@@ -19,6 +19,7 @@
+ #include "debug.h"
+ #include "mouse.h"
+ #include <sys/signal.h>
++#include <cassert>
+ 
+ #if defined(__FreeBSD__)
+ Mouse* Mouse::pMouse = NULL;

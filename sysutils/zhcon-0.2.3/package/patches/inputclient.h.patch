@@ -1,0 +1,10 @@
+--- ./src/inputclient.h.orig	2002-05-12 04:58:28.000000000 +0100
++++ ./src/inputclient.h	2023-05-21 10:32:03.112618557 +0100
+@@ -21,6 +21,7 @@
+ 
+ #include <string>
+ #include "console.h"
++#include <cassert>
+ 
+ /**
+   *@author ejoy

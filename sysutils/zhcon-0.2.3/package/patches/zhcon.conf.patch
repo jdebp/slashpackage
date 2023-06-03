@@ -1,0 +1,26 @@
+--- ./src/zhcon.conf.orig	2003-04-17 12:39:45.000000000 +0100
++++ ./src/zhcon.conf	2023-05-21 19:45:58.461855235 +0100
+@@ -24,7 +24,7 @@
+ # 2) If your FreeBSD kernel has VESA support compiled in(with
+ #    "options VESA") and your display adapter support VESA(most cards will
+ #    do), you can set color_depth to 8 or higher. This means you can use
+-#    640x480x256 colors, 640x480x65536 colors, 800x600x256 colors...etc
++#    640x480x256 colors, 640x480x65536 colors, 640x480x16777216 colors...etc
+ #    BUT you will not able to use 640x480x16 colors! (Of course I don't
+ #    think you will want to run 16 colors mode at all :))
+ # 3) If your FreeBSD kernel has not VESA support(or you even don't know
+@@ -37,11 +37,9 @@
+ x_resolution = 640
+ y_resolution = 480
+ # 4 bits = 16 colors, 8 bits = 256 colors, 16 bits = 64K colors, and so on..
+-# By defalut, 640X480X16 color is used to support as many video cards as
+-# possible. zhcon works very SLOWLY under this mode. You should try setting 
+-# color_depth=8 to use 256 color (VESA mode) after recompiling your kernel
+-# with VESA support to gain most out of your hardware.
+-color_depth = 4 
++# By default, 640X480X256 color is used to support as many video cards as
++# possible, given that this is a basic VGA mode and 4-bit colour is non-linear.
++color_depth = 8 
+ 
+ #blanklineheight must >= 0
+ blanklineheight = 1
