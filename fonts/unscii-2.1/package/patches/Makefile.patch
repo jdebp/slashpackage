@@ -1,0 +1,204 @@
+--- Makefile.orig	2020-10-11 15:00:54.000000000 +0100
++++ Makefile	2023-06-06 03:14:45.037920081 +0100
+@@ -5,124 +5,105 @@
+ 
+ CC=gcc -Os
+ 
+-all: unscii-16.pcf unscii-8.pcf unscii-16-full.pcf \
+-     unscii-8-alt.pcf unscii-8-thin.pcf unscii-8-tall.pcf unscii-8-mcr.pcf unscii-8-fantasy.pcf \
+-     unscii-16.ttf unscii-8.ttf unscii-16-full.ttf \
+-     unscii-8-alt.ttf unscii-8-thin.ttf unscii-8-tall.ttf unscii-8-mcr.ttf unscii-8-fantasy.ttf \
+-     bm2uns
++.SUFFIXES: .hex .svg .fnt .bdf .pcf .ttf
++
++all: fnt bdf pcf ttf bm2uns
++
++hex: unscii-16.hex unscii-8.hex unscii-16-full.hex unscii-8-tall.hex unscii-8-alt.hex unscii-8-arcade.hex unscii-8-atari8.hex unscii-8-bbcg.hex unscii-8-c64.hex unscii-8-cpc.hex unscii-8-fantasy.hex unscii-8-mcr.hex unscii-8-pc16.hex unscii-8-pc8.hex unscii-8-pet.hex unscii-8-spectrum.hex unscii-8-st.hex unscii-8-thin.hex unscii-8-topaz.hex unscii-16-arcade.hex unscii-16-atari8.hex unscii-16-bbcg.hex unscii-16-c64.hex unscii-16-cpc.hex unscii-16-pc16.hex unscii-16-pc16.hex unscii-16-pet.hex unscii-16-spectrum.hex unscii-16-st.hex unscii-16-topaz.hex
++fnt: unscii-16.fnt unscii-8.fnt unscii-16-full.fnt unscii-8-tall.fnt unscii-8-alt.fnt unscii-8-arcade.fnt unscii-8-atari8.fnt unscii-8-bbcg.fnt unscii-8-c64.fnt unscii-8-cpc.fnt unscii-8-fantasy.fnt unscii-8-mcr.fnt unscii-8-pc16.fnt unscii-8-pc8.fnt unscii-8-pet.fnt unscii-8-spectrum.fnt unscii-8-st.fnt unscii-8-thin.fnt unscii-8-topaz.fnt unscii-16-arcade.fnt unscii-16-atari8.fnt unscii-16-bbcg.fnt unscii-16-c64.fnt unscii-16-cpc.fnt unscii-16-pc16.fnt unscii-16-pc16.fnt unscii-16-pet.fnt unscii-16-spectrum.fnt unscii-16-st.fnt unscii-16-topaz.fnt
++bdf: unscii-16.bdf unscii-8.bdf unscii-16-full.bdf unscii-8-tall.bdf unscii-8-alt.bdf unscii-8-arcade.bdf unscii-8-atari8.bdf unscii-8-bbcg.bdf unscii-8-c64.bdf unscii-8-cpc.bdf unscii-8-fantasy.bdf unscii-8-mcr.bdf unscii-8-pc16.bdf unscii-8-pc8.bdf unscii-8-pet.bdf unscii-8-spectrum.bdf unscii-8-st.bdf unscii-8-thin.bdf unscii-8-topaz.bdf unscii-16-arcade.bdf unscii-16-atari8.bdf unscii-16-bbcg.bdf unscii-16-c64.bdf unscii-16-cpc.bdf unscii-16-pc16.bdf unscii-16-pc16.bdf unscii-16-pet.bdf unscii-16-spectrum.bdf unscii-16-st.bdf unscii-16-topaz.bdf
++svg: unscii-16.svg unscii-8.svg unscii-16-full.svg unscii-8-tall.svg unscii-8-alt.svg unscii-8-arcade.svg unscii-8-atari8.svg unscii-8-bbcg.svg unscii-8-c64.svg unscii-8-cpc.svg unscii-8-fantasy.svg unscii-8-mcr.svg unscii-8-pc16.svg unscii-8-pc8.svg unscii-8-pet.svg unscii-8-spectrum.svg unscii-8-st.svg unscii-8-thin.svg unscii-8-topaz.svg unscii-16-arcade.svg unscii-16-atari8.svg unscii-16-bbcg.svg unscii-16-c64.svg unscii-16-cpc.svg unscii-16-pc16.svg unscii-16-pc16.svg unscii-16-pet.svg unscii-16-spectrum.svg unscii-16-st.svg unscii-16-topaz.svg
++pcf: unscii-16.pcf unscii-8.pcf unscii-16-full.pcf unscii-8-tall.pcf unscii-8-alt.pcf unscii-8-arcade.pcf unscii-8-atari8.pcf unscii-8-bbcg.pcf unscii-8-c64.pcf unscii-8-cpc.pcf unscii-8-fantasy.pcf unscii-8-mcr.pcf unscii-8-pc16.pcf unscii-8-pc8.pcf unscii-8-pet.pcf unscii-8-spectrum.pcf unscii-8-st.pcf unscii-8-thin.pcf unscii-8-topaz.pcf unscii-16-arcade.pcf unscii-16-atari8.pcf unscii-16-bbcg.pcf unscii-16-c64.pcf unscii-16-cpc.pcf unscii-16-pc16.pcf unscii-16-pc16.pcf unscii-16-pet.pcf unscii-16-spectrum.pcf unscii-16-st.pcf unscii-16-topaz.pcf
++ttf: unscii-16.ttf unscii-8.ttf unscii-16-full.ttf unscii-8-tall.ttf unscii-8-alt.ttf unscii-8-arcade.ttf unscii-8-atari8.ttf unscii-8-bbcg.ttf unscii-8-c64.ttf unscii-8-cpc.ttf unscii-8-fantasy.ttf unscii-8-mcr.ttf unscii-8-pc16.ttf unscii-8-pc8.ttf unscii-8-pet.ttf unscii-8-spectrum.ttf unscii-8-st.ttf unscii-8-thin.ttf unscii-8-topaz.ttf unscii-16-arcade.ttf unscii-16-atari8.ttf unscii-16-bbcg.ttf unscii-16-c64.ttf unscii-16-cpc.ttf unscii-16-pc16.ttf unscii-16-pc16.ttf unscii-16-pet.ttf unscii-16-spectrum.ttf unscii-16-st.ttf unscii-16-topaz.ttf
+ 
+ VERSION=2.1
+ 
+-HEX2BDF=./hex2bdf.pl --version=$(VERSION)
++ASSEMBLE=perl ./assemble.pl
++HEX2BDF=perl ./hex2bdf.pl --version=$(VERSION)
+ 
+ ### HEX ###
+ 
+-unscii-16.hex: $(SRC)
+-	./assemble.pl
++unscii-16.hex unscii-8.hex: $(SRC)
++	$(ASSEMBLE)
+ 
+-unscii-8.hex: $(SRC)
+-	./assemble.pl
++unscii-8-alt.hex unscii-16-alt.hex: $(SRC) font-alt.txt
++	$(ASSEMBLE) alt
+ 
+-unscii-8-alt.hex: $(SRC) font-alt.txt
+-	./assemble.pl alt
++unscii-8-arcade.hex unscii-16-arcade.hex: $(SRC) font-arcade.txt
++	$(ASSEMBLE) arcade
+ 
+-unscii-8-thin.hex: $(SRC) font-thin.txt
+-	./assemble.pl thin
++unscii-8-atari8.hex unscii-16-atari8.hex: $(SRC) font-atari8.txt
++	$(ASSEMBLE) atari8
+ 
+-unscii-8-mcr.hex: $(SRC) font-mcr.txt
+-	./assemble.pl mcr
++unscii-8-bbcg.hex unscii-16-bbcg.hex: $(SRC) font-bbcg.txt
++	$(ASSEMBLE) bbcg
+ 
+-unscii-8-fantasy.hex: $(SRC) font-fantasy.txt
+-	./assemble.pl fantasy
++unscii-8-c64.hex unscii-16-c64.hex: $(SRC) font-c64.txt
++	$(ASSEMBLE) c64
+ 
+-unscii-8-tall.hex: unscii-8.hex
+-	./doubleheight.pl < unscii-8.hex > unscii-8-tall.hex
++unscii-8-cpc.hex unscii-16-cpc.hex: $(SRC) font-cpc.txt
++	$(ASSEMBLE) cpc
+ 
+-unscii-16-full.hex: unscii-16.hex unifont.hex fsex-adapted.hex
+-	./merge-otherfonts.pl > unscii-16-full.hex
++unscii-8-fantasy.hex unscii-16-fantasy.hex: $(SRC) font-fantasy.txt
++	$(ASSEMBLE) fantasy
+ 
+-### PCF ###
+-
+-unscii-16.pcf: unscii-16.hex
+-	$(HEX2BDF) --variant='16' --rows=16 < unscii-16.hex | bdftopcf > unscii-16.pcf
++unscii-8-mcr.hex unscii-16-mcr.hex: $(SRC) font-mcr.txt
++	$(ASSEMBLE) mcr
+ 
+-unscii-8.pcf: unscii-8.hex
+-	$(HEX2BDF) --variant='8' --rows=8 < unscii-8.hex | bdftopcf > unscii-8.pcf
++unscii-8-pc16.hex unscii-16-pc16.hex: $(SRC) font-pc16.txt
++	$(ASSEMBLE) pc16
+ 
+-unscii-8-alt.pcf: unscii-8-alt.hex
+-	$(HEX2BDF) --variant='alt' --rows=8 < unscii-8-alt.hex | bdftopcf > unscii-8-alt.pcf
++unscii-8-pc8.hex unscii-16-pc8.hex: $(SRC) font-pc8.txt
++	$(ASSEMBLE) pc8
+ 
+-unscii-8-thin.pcf: unscii-8-thin.hex
+-	$(HEX2BDF) --variant='thin' --rows=8 < unscii-8-thin.hex | bdftopcf > unscii-8-thin.pcf
++unscii-8-pet.hex unscii-16-pet.hex: $(SRC) font-pet.txt
++	$(ASSEMBLE) pet
+ 
+-unscii-8-tall.pcf: unscii-8-tall.hex
+-	$(HEX2BDF) --variant='tall' --rows=16 < unscii-8-tall.hex | bdftopcf > unscii-8-tall.pcf
++unscii-8-spectrum.hex unscii-16-spectrum.hex: $(SRC) font-spectrum.txt
++	$(ASSEMBLE) spectrum
+ 
+-unscii-8-mcr.pcf: unscii-8-mcr.hex
+-	$(HEX2BDF) --variant='mcr' --rows=8 < unscii-8-mcr.hex | bdftopcf > unscii-8-mcr.pcf
++unscii-8-st.hex unscii-16-st.hex: $(SRC) font-st.txt
++	$(ASSEMBLE) st
+ 
+-unscii-8-fantasy.pcf: unscii-8-fantasy.hex
+-	$(HEX2BDF) --variant='fantasy' --rows=8 < unscii-8-fantasy.hex | bdftopcf > unscii-8-fantasy.pcf
++unscii-8-thin.hex unscii-16-thin.hex: $(SRC) font-thin.txt
++	$(ASSEMBLE) thin
+ 
+-unscii-16-full.pcf: unscii-16-full.hex
+-	$(HEX2BDF) --variant='full' --rows=16 < unscii-16-full.hex | bdftopcf > unscii-16-full.pcf
++unscii-8-topaz.hex unscii-16-topaz.hex: $(SRC) font-topaz.txt
++	$(ASSEMBLE) topaz
+ 
+-### SVG ###
++unscii-8-tall.hex: unscii-8.hex
++	./doubleheight.pl < unscii-8.hex > unscii-8-tall.hex
+ 
+-unscii-16.svg: unscii-16.hex vectorize
+-	./vectorize 16 16 < unscii-16.hex > unscii-16.svg
++unscii-16-full.hex: unscii-16.hex unifont.hex fsex-adapted.hex
++	./merge-otherfonts.pl > unscii-16-full.hex
+ 
+-unscii-8.svg: unscii-8.hex vectorize
+-	./vectorize 8 8 < unscii-8.hex > unscii-8.svg
++### FNT ###
+ 
+-unscii-8-alt.svg: unscii-8-alt.hex vectorize
+-	./vectorize 8 alt alt < unscii-8-alt.hex > unscii-8-alt.svg
++.hex.fnt:
++	vtfontcvt $< $@
+ 
+-unscii-8-thin.svg: unscii-8-thin.hex vectorize
+-	./vectorize 8 thin < unscii-8-thin.hex > unscii-8-thin.svg
++### PCF ###
+ 
+-unscii-8-tall.svg: unscii-8-tall.hex vectorize
+-	./vectorize 8 tall < unscii-8-tall.hex > unscii-8-tall.svg
++.hex.bdf:
++	$(HEX2BDF) --variant='16' --rows=16 < $< > $@
+ 
+-unscii-8-mcr.svg: unscii-8-mcr.hex vectorize
+-	./vectorize 8 mcr < unscii-8-mcr.hex > unscii-8-mcr.svg
++.bdf.pcf:
++	bdftopcf < $< > $@
+ 
+-unscii-8-fantasy.svg: unscii-8-fantasy.hex vectorize
+-	./vectorize 8 fantasy < unscii-8-fantasy.hex > unscii-8-fantasy.svg
++### SVG ###
+ 
+-unscii-16-full.svg: unscii-16-full.hex vectorize
+-	./vectorize 16 full < unscii-16-full.hex > unscii-16-full.svg
++.hex.svg: vectorize
++	./vectorize 16 16 < $< > $@
+ 
+ ### TTF/OTF/WOFF ###
+ 
+-unscii-16.ttf: unscii-16.svg
+-	./makevecfonts.ff unscii-16
+-
+-unscii-8.ttf: unscii-8.svg
+-	./makevecfonts.ff unscii-8
+-
+-unscii-8-alt.ttf: unscii-8-alt.svg
+-	./makevecfonts.ff unscii-8-alt
+-
+-unscii-8-thin.ttf: unscii-8-thin.svg
+-	./makevecfonts.ff unscii-8-thin
+-
+-unscii-8-tall.ttf: unscii-8-tall.svg
+-	./makevecfonts.ff unscii-8-tall
+-
+-unscii-8-mcr.ttf: unscii-8-mcr.svg
+-	./makevecfonts.ff unscii-8-mcr
+-
+-unscii-8-fantasy.ttf: unscii-8-fantasy.svg
+-	./makevecfonts.ff unscii-8-fantasy
+-
+-unscii-16-full.ttf: unscii-16-full.svg
+-	./makevecfonts.ff unscii-16-full
++.svg.ttf: makevecfonts.ff
++	./makevecfonts.ff $*
+ 
+ ### tools ###
+ 
+ uns2uni.tr: $(SRC)
+-	./assemble.pl
++	$(ASSEMBLE)
+ 
+ vectorize: vectorize.c
+ 	$(CC) vectorize.c -o vectorize
+@@ -142,12 +123,12 @@
+ ### release ###
+ 
+ clean:
+-	rm -f *~ *.pcf *.svg unscii*.hex vectorize bm2uns bm2uns.i *.ttf *.otf *.woff \
++	rm -f *~ *.pcf *.svg unscii*.hex vectorize *.ttf *.otf *.woff *.o *.fnt \
+ 	uns2uni.tr uns2uni uni2uns DEADJOE
+ 
+ srcpackage: clean
+ 	cd .. && tar czf unscii-$(VERSION)-src.tar.gz unscii-$(VERSION)-src
+ 
+ web:
+-	cp *.pcf *.ttf *.otf *.woff *.hex ../web/
++	cp *.pcf *.ttf *.otf *.woff ../web/
+ 	cp ../unscii-$(VERSION)-src.tar.gz ../web/

@@ -1,0 +1,219 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+name='unscii'
+version='2.1'
+suffix='-src'
+gittag='main'
+
+if test -d ../"${name}.git"
+then
+	# Create and checkout the source directory
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		rm -f -- source/.git
+		ln -f -s -- ../../"${name}.git" source/.git
+		( cd source && git checkout -f "${gittag}" )
+		# Apply our patches
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -i ../"${patchfile}"
+		done
+	fi
+else
+	# Download the source
+	if test \! -d dist/"${name}-${version}${suffix}"/
+	then
+		install -d -m 0755 dist
+		case "`uname`" in
+		Linux) fetch=wget ; FETCHARGS= ;;
+		OpenBSD) fetch=ftp ; FETCHARGS= ;;
+		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		esac
+		extension='.tar.gz'
+		url='http://viznut.fi'/"${name}"/"${name}-${version}${suffix}${extension}"
+		SHA256='4d1215d495e49d005ae70828ec1529e997049b9a7f152b9439d78c7e70c65b57'
+		SIZE='1277989'
+		archive="${name}-${version}${suffix}${extension}" 
+		( 
+			cd dist 
+			"${fetch}" -o "${archive}" "${url}"
+			sha256 -c "${SHA256}" "${archive}"
+			pax -r -z < "${archive}"
+		)
+		rm -r -f -- source
+	fi
+
+	# Create and populate the source directory
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		( cd dist/"${name}-${version}${suffix}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
+		# Apply our patches
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -i ../"${patchfile}"
+		done
+	fi
+fi
+
+export CDPATH=
+
+# Create and populate the build directory.
+install -d -m 0755 build
+( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	case "`uname`" in
+	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
+	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
+	esac
+	if > /dev/null expr "${cpus}" '>' 4
+	then
+		cpus=4
+	fi
+fi
+(
+	cd build
+	make ${cpus:+ -j "${cpus}"} fnt bdf
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual config/fonts
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		rm -f -- command/"$i"{new}
+		if objdump -f build/"$i" >/dev/null 2>&1
+		then
+			install -m 0755 -p -- build/"$i" command/"$i"{new}
+			strip -p -- command/"$i"{new}
+			chmod 0555 command/"$i"{new}
+		else
+			install -m 0555 -p -- build/"$i" command/"$i"{new}
+		fi
+	done
+	# All of the aliases for other commands
+	test -r package/aliases${section} && cat package/aliases${section} |
+	while read -r command alias
+	do
+		rm -f -- command/"${alias}"{new}
+		ln -f -- command/"${command}"{new} command/"${alias}"{new}
+	done
+	# All of the commands that have their own manual pages
+	(
+		test -r package/commands${section} && cat package/commands${section}
+		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
+	) |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section} manual/ja/man${section}
+		rm -f -- manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/doc/"$i".${section} manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/doc/ja/"$i".${section} manual/ja/man${section}/"$i".${section}{new}
+	done
+	# All of the manual pages for aliases
+	(
+		test -r package/aliases${section} && cat package/aliases${section}
+	) |
+	while read -r command alias
+	do
+		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
+		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
+		ln -f -s -- "${command}".${section} manual/man${section}/"${alias}".${section}{new}
+		ln -f -s -- "${command}".${section} manual/ja/man${section}/"${alias}".${section}{new}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for directory in en_GB.UTF-8 en.UTF-8
+do
+	rm -f -- manual/"${directory}"{new}
+	ln -f -s -- . manual/"${directory}"{new}
+done
+
+# ##############################################################################
+# Rename the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables and all of their aliases
+	(
+		test -r package/commands${section} && cat package/commands${section}
+		test -r package/aliases${section} && awk '{print $2;}' package/aliases${section}
+	) |
+	while read -r i
+	do
+		mv -f -- command/"$i"{new} command/"$i"
+	done
+	# All of the commands that have their own manual pages
+	(
+		test -r package/commands${section} && cat package/commands${section}
+		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
+	) |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+		mv -f -- manual/ja/man${section}/"$i".${section}{new} manual/ja/man${section}/"$i".${section}
+	done
+	# All of the manual pages for aliases
+	(
+		test -r package/aliases${section} && cat package/aliases${section}
+	) |
+	while read -r command alias
+	do
+		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
+		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
+		mv -f -- manual/man${section}/"${alias}".${section}{new} manual/man${section}/"${alias}".${section}
+		mv -f -- manual/ja/man${section}/"${alias}".${section}{new} manual/ja/man${section}/"${alias}".${section}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for directory in en_GB.UTF-8 en.UTF-8
+do
+	test -e manual/"${directory}" && mv -f -- manual/"${directory}" manual/"${directory}"{old}
+	mv -f -- manual/"${directory}"{new} manual/"${directory}"
+	rm -f -- manual/"${directory}"{old}
+done
+
+# ##############################################################################
+# Build all of the ...{new} files in ./config.
+(
+	test -r package/fonts && cat package/fonts
+) |
+while read -r font
+do
+	rm -f -- config/fonts/"${font}".fnt{new}
+	rm -f -- config/fonts/"${font}".bdf{new}
+	install -m 0444 -p -- build/"${font}".fnt config/fonts/"${font}".fnt{new}
+	install -m 0444 -p -- build/"${font}".bdf config/fonts/"${font}".bdf{new}
+done
+
+# ##############################################################################
+# Rename the ...{new} directories and files in ./config.
+(
+	test -r package/fonts && cat package/fonts
+) |
+while read -r font
+do
+	mv -f -- config/fonts/"${font}".fnt{new} config/fonts/"${font}".fnt
+	mv -f -- config/fonts/"${font}".bdf{new} config/fonts/"${font}".bdf
+done
