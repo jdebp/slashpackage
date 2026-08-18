@@ -1,6 +1,7 @@
 build
 command
 config
+guide
 manual
 source
 yash-2.54.tar.gz

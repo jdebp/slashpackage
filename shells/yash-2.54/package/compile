@@ -22,7 +22,7 @@ then
 		find package/patches -name '*.patch' |
 		while read -r patchfile
 		do
-			patch -t -N -d source/ -i ../"${patchfile}"
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
 		done
 	fi
 else
@@ -32,8 +32,7 @@ else
 		install -d -m 0755 dist
 		case "`uname`" in
 		Linux) fetch=wget ; FETCHARGS= ;;
-		OpenBSD) fetch=ftp ; FETCHARGS= ;;
-		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
 		extension='.tar.gz'
 		#url='https://osdn.net/frs/redir.php?m=nchc&f=yash%2F78345%2F'"${name}-${version}${extension}"
@@ -75,10 +74,10 @@ else
 		install -d -m 0755 source
 		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
 		# Apply our patches
-		find package/patches -name '*.patch' |
+		find package/patches -type f -name '*.patch' |
 		while read -r patchfile
 		do
-			patch -t -N -d source/ -i ../"${patchfile}"
+			patch -t -N -d source -p 0 -i ../"${patchfile}"
 		done
 	fi
 fi
@@ -88,6 +87,16 @@ export CDPATH=
 # Create and populate the build directory.
 install -d -m 0755 build
 ( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+
+# Check build command dependencies.
+for tool in asciidoc xgettext
+do
+	if ! > /dev/null command -v "${tool}"
+	then
+		echo "${tool} is a required tool for building this package." 1>&2
+		exit 100
+	fi
+done
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
@@ -112,7 +121,7 @@ fi
 # The build and release directories need not be on the same disc volume.
 # And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
 # But released files can be links to other released files, of course.
-install -d -m 0755 command manual config manual/ja config/locale config/share
+install -d -m 0755 command manual guide config manual/ja guide/ja config/locale config/share
 
 # ##############################################################################
 # Build all of the ...{new} files in ./command and ./manual.
@@ -161,6 +170,15 @@ do
 		ln -f -s -- "${command}".${section} manual/ja/man${section}/"${alias}".${section}{new}
 	done
 done
+# Main guide pages
+cat package/guidepages |
+while read -r i
+do
+	rm -f -- guide/"$i".html{new}
+	rm -f -- guide/ja/"$i".html{new}
+	install -m 0444 -p -- build/doc/"$i".html guide/"$i".html{new}
+	install -m 0444 -p -- build/doc/ja/"$i".html guide/ja/"$i".html{new}
+done
 # Symbolic links in place of subdirectories to fool the man(1) command
 for directory in en_GB.UTF-8 en.UTF-8
 do
@@ -205,6 +223,13 @@ do
 		mv -f -- manual/man${section}/"${alias}".${section}{new} manual/man${section}/"${alias}".${section}
 		mv -f -- manual/ja/man${section}/"${alias}".${section}{new} manual/ja/man${section}/"${alias}".${section}
 	done
+done
+# Main guide pages
+cat package/guidepages |
+while read -r i
+do
+	mv -f -- guide/"$i".html{new} guide/"$i".html
+	mv -f -- guide/ja/"$i".html{new} guide/ja/"$i".html
 done
 # Symbolic links in place of subdirectories to fool the man(1) command
 for directory in en_GB.UTF-8 en.UTF-8 ja_JP.UTF-8 ja.UTF-8

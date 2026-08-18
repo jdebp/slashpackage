@@ -1,7 +1,7 @@
-debian:syst
-bsd:syst
 build:syst
 command:syst
+config:syst
+guide:syst
 manual:syst
 package:dist
 source:dist
