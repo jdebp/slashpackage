@@ -33,8 +33,7 @@ else
 		install -d -m 0755 dist
 		case "`uname`" in
 		Linux) fetch=wget ; FETCHARGS= ;;
-		OpenBSD) fetch=ftp ; FETCHARGS= ;;
-		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
 		extension='.tar.gz'
 		url='http://offog.org/files/'/"${name}-${version}${extension}"
