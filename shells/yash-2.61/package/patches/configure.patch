@@ -1,0 +1,22 @@
+diff --git configure configure
+index 9bd847c..4555194 100755
+--- configure
++++ configure
+@@ -746,6 +746,7 @@ END
+ 	checking "for ${i%:*}"
+ 	cat >"${tempsrc}" <<END
+ ${confighdefs}
++#include <stdio.h>
+ #if HAVE_CURSES_H
+ #include <curses.h>
+ #elif HAVE_NCURSES_H
+@@ -756,9 +757,6 @@ ${confighdefs}
+ #include <ncursesw/ncurses.h>
+ #endif
+ #include <${i%:*}>
+-#ifndef putchar
+-int putchar(int);
+-#endif
+ 
+ int main(void) {
+ /* Undeclared identifiers are a syntax error in C99, but many compilers assume
