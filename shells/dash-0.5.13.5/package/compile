@@ -19,11 +19,14 @@ then
 		ln -f -s -- ../../"${name}.git" source/.git
 		( cd source && git checkout -f "v${version}" )
 		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
-		done
+		if test -d package/patches
+		then
+			find package/patches -name '*.patch' |
+			while read -r patchfile
+			do
+				patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+			done
+		fi
 	fi
 else
 	# Download the source
@@ -55,11 +58,14 @@ else
 		install -d -m 0755 source
 		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
 		# Apply our patches
-		find package/patches -type f -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source -p 0 -i ../"${patchfile}"
-		done
+		if test -d package/patches
+		then
+			find package/patches -type f -name '*.patch' |
+			while read -r patchfile
+			do
+				patch -t -N -d source -p 0 -i ../"${patchfile}"
+			done
+		fi
 	fi
 fi
 
@@ -70,7 +76,7 @@ install -d -m 0755 build
 ( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
 
 # Check build command dependencies.
-for tool in asciidoc xgettext
+for tool in asciidoc xgettext aclocal autoheader automake autoconf
 do
 	if ! > /dev/null command -v "${tool}"
 	then
@@ -95,7 +101,7 @@ fi
 (
 	cd build
 	test -r configure || sh ./autogen.sh
-	test -r config.status || ./configure --with-libedit
+	test -r config.status || ./configure --with-libedit --enable-glob --enable-fnmatch
 	case "`uname`" in
 	Linux) make='make' ;;
 	*) make='gmake' ;;
