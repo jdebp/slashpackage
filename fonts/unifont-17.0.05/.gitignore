@@ -4,3 +4,5 @@ manual
 config
 source
 dist
+unifont-*.tar.gz
+unifont-*.tar.bz2
