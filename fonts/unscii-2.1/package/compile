@@ -34,8 +34,7 @@ else
 		install -d -m 0755 dist
 		case "`uname`" in
 		Linux) fetch=tnftp ; FETCHARGS= ;;
-		OpenBSD) fetch=ftp ; FETCHARGS= ;;
-		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
 		extension='.tar.gz'
 		url='http://viznut.fi'/"${name}"/"${name}-${version}${suffix}${extension}"
