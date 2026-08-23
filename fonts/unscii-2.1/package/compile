@@ -33,7 +33,7 @@ else
 	then
 		install -d -m 0755 dist
 		case "`uname`" in
-		Linux) fetch=wget ; FETCHARGS= ;;
+		Linux) fetch=tnftp ; FETCHARGS= ;;
 		OpenBSD) fetch=ftp ; FETCHARGS= ;;
 		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
 		esac
@@ -41,9 +41,9 @@ else
 		url='http://viznut.fi'/"${name}"/"${name}-${version}${suffix}${extension}"
 		SHA256='4d1215d495e49d005ae70828ec1529e997049b9a7f152b9439d78c7e70c65b57'
 		SIZE='1277989'
-		archive="${name}-${version}${suffix}${extension}" 
-		( 
-			cd dist 
+		archive="${name}-${version}${suffix}${extension}"
+		(
+			cd dist
 			"${fetch}" -o "${archive}" "${url}"
 			sha256 -c "${SHA256}" "${archive}"
 			pax -r -z < "${archive}"

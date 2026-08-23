@@ -37,13 +37,12 @@ else
 	then
 		install -d -m 0755 dist
 		case "`uname`" in
-		Linux) fetch=wget ; FETCHARGS= ;;
-		OpenBSD) fetch=ftp ; FETCHARGS= ;;
-		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		Linux) fetch=tnftp ; FETCHARGS= ;;
+		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
-		archive="${name}-${version}${extension}" 
-		( 
-			cd dist 
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
 			"${fetch}" -o "${archive}" "${url}"
 			sha256 -c "${SHA256}" "${archive}"
 			pax -r -z < "${archive}"

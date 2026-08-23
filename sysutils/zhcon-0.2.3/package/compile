@@ -31,17 +31,16 @@ else
 	then
 		install -d -m 0755 dist
 		case "`uname`" in
-		Linux) fetch=wget ; FETCHARGS= ;;
-		OpenBSD) fetch=ftp ; FETCHARGS= ;;
-		*BSD) fetch=fetch ; FETCHARGS="-S ${SIZE}" ;;
+		Linux) fetch=tnftp ; FETCHARGS= ;;
+		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
 		extension='.tar.gz'
 		url='http://downloads.sourceforge.net/project/'"${name}/${name}/${version}/${name}-${version}${extension}"
 		SHA256='60e2f7a3b2a548e043838794b7ab3cb0e84f13508d48b384e9b6598698baacbb'
 		SIZE='5030677'
-		archive="${name}-${version}${extension}" 
-		( 
-			cd dist 
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
 			"${fetch}" -o "${archive}" "${url}"
 			sha256 -c "${SHA256}" "${archive}"
 			pax -r -z < "${archive}"

@@ -31,18 +31,20 @@ else
 	then
 		install -d -m 0755 dist
 		case "`uname`" in
-		Linux) fetch=wget ; FETCHARGS= ;;
+		Linux) fetch=tnftp ; FETCHARGS= ;;
 		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
 		extension='.tar.gz'
 		url='http://ftpmirror.gnu.org'/"${name}"/"${name}-${version}"/"${name}-${version}${extension}"
 		SHA256='2eee0454e7e570ac22b637f9f622a9c06cfc56e61931069d0d667ce5c2ae189e'
 		SIZE='32845898'
-		archive="${name}-${version}${extension}" 
-		( 
-			cd dist 
-			"${fetch}" -o "${archive}" "${url}"
-			sha256 -c "${SHA256}" "${archive}"
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
+			test -r "${archive}" || "${fetch}" -o "${archive}" "${url}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
 			pax -r -z < "${archive}"
 		)
 		# Cleanup bogus stuff in the source archive

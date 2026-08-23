@@ -32,7 +32,7 @@ else
 	then
 		install -d -m 0755 dist
 		case "`uname`" in
-		Linux) fetch=wget ; FETCHARGS= ;;
+		Linux) fetch=tnftp ; FETCHARGS= ;;
 		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
 		extension='.tar.gz'
