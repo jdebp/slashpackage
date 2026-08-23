@@ -64,3 +64,7 @@ nosh-1.9
 ptyget
 publicfile
 ucspi-tcp
+*.buildinfo
+*.dsc
+*.changes
+*.tar.gz
