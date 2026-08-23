@@ -38,8 +38,8 @@ else
 		esac
 		extension='.tar.gz'
 		url='http://viznut.fi'/"${name}"/"${name}-${version}${suffix}${extension}"
-		SHA256='4d1215d495e49d005ae70828ec1529e997049b9a7f152b9439d78c7e70c65b57'
-		SIZE='1277989'
+		SHA256='x'
+		SIZE='x'
 		archive="${name}-${version}${suffix}${extension}"
 		(
 			cd dist
@@ -69,6 +69,16 @@ export CDPATH=
 # Create and populate the build directory.
 install -d -m 0755 build
 ( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+
+# Check build command dependencies.
+for tool in vtfontcvt
+do
+	if ! > /dev/null command -v "${tool}"
+	then
+		echo "${tool} is a required tool for building this package." 1>&2
+		exit 100
+	fi
+done
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
