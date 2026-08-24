@@ -1,0 +1,32 @@
+diff --git src/input.c src/input.c
+index e9b9d33..38bde12 100644
+--- src/input.c
++++ src/input.c
+@@ -408,9 +408,14 @@ again:
+ 			if (!IS_DEFINED_SMALL && nr > 0)
+ 				goto save;
+ 			INTON;
++			if (parsefile->fd == 0 && stdin_istty) {
++				parsefile->eof = 1;
++				return PEOF;
++			}
+ 			goto eof;
+ 		}
+ 	}
++	parsefile->eof &= ~1;
+ 
+ 	if (IS_DEFINED_SMALL) {
+ 		q += more;
+diff --git src/input.h src/input.h
+index 59dc5a1..8876dfa 100644
+--- src/input.h
++++ src/input.h
+@@ -79,7 +79,7 @@ struct parsefile {
+ 	int linno;		/* current line */
+ 	int fd;			/* file descriptor (or -1 if string) */
+ 	int nleft;		/* number of chars left in this line */
+-	int eof;		/* do not read again once we hit EOF */
++	int eof;		/* bit 0: EOF has been read; bit 1: do not read again, EOF is permanent */
+ 	char *nextc;		/* next char in buffer */
+ 	char *buf;		/* input buffer */
+ 	struct strpush *strpush; /* for pushing strings at this level */
