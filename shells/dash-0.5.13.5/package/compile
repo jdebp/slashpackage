@@ -8,28 +8,40 @@ fi
 
 name='dash'
 version='0.5.13.5'
+gittag="v${version}"
+source_archive() {
+	extension='.tar.gz'
+	url='https://git.kernel.org/pub/scm/utils/'"${name}"'/'"${name}"'.git/snapshot/'"${name}"'-'"${version}${extension}"
+	SHA256='x'
+	SIZE='x'
+}
+buildtools="asciidoc xgettext aclocal autoheader automake autoconf"
+
+apply_local_patches() {
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+}
 
 if test -d ../"${name}.git"
 then
-	# Create and checkout the source directory
+	# Create and checkout the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		rm -f -- source/.git
 		ln -f -s -- ../../"${name}.git" source/.git
-		( cd source && git checkout -f "v${version}" )
-		# Apply our patches
-		if test -d package/patches
-		then
-			find package/patches -name '*.patch' |
-			while read -r patchfile
-			do
-				patch -t -N -d source/ -p 0 -i ../"${patchfile}"
-			done
-		fi
+		( cd source && git checkout -f "${gittag}" )
+		apply_local_patches
 	fi
 else
-	# Download the source
+	# Download the source.
 	if test \! -d dist/"${name}-${version}"/
 	then
 		install -d -m 0755 dist
@@ -37,35 +49,26 @@ else
 		Linux) fetch=tnftp ; FETCHARGS= ;;
 		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
-		extension='.tar.gz'
-		url='https://git.kernel.org/pub/scm/utils/'"${name}"'/'"${name}"'.git/snapshot/'"${name}"'-'"${version}${extension}"
-		SHA256='x'
-		SIZE='x'
+		source_archive
 		archive="${name}-${version}${extension}"
 		(
 			cd dist
 			"${fetch}" -o "${archive}" "${url}"
-			sha256 -c "${SHA256}" "${archive}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
 			pax -r -z < "${archive}"
 		)
-		# Cleanup bogus stuff in the source archive
+		# Force re-creation of the source directory.
 		rm -r -f -- source
 	fi
 
-	# Create and populate the source directory
+	# Create and populate the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		# Apply our patches
-		if test -d package/patches
-		then
-			find package/patches -type f -name '*.patch' |
-			while read -r patchfile
-			do
-				patch -t -N -d source -p 0 -i ../"${patchfile}"
-			done
-		fi
+		apply_local_patches
 	fi
 fi
 
@@ -76,7 +79,7 @@ install -d -m 0755 build
 ( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
 
 # Check build command dependencies.
-for tool in asciidoc xgettext aclocal autoheader automake autoconf
+for tool in ${buildtools}
 do
 	if ! > /dev/null command -v "${tool}"
 	then
@@ -113,7 +116,7 @@ fi
 # The build and release directories need not be on the same disc volume.
 # And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
 # But released files can be links to other released files, of course.
-install -d -m 0755 command manual guide
+install -d -m 0755 command manual
 
 # ##############################################################################
 # Build all of the ...{new} files in ./command and ./manual.

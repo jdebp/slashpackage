@@ -8,25 +8,40 @@ fi
 
 name='unifont'
 version='15.0.06'
+gittag="${version}"
+source_archive() {
+	extension='.tar.gz'
+	url='http://ftpmirror.gnu.org'/"${name}"/"${name}-${version}"/"${name}-${version}${extension}"
+	SHA256='36668eb1326d22e1466b94b3929beeafd10b9838bf3d41f4e5e3b52406ae69f1'
+	SIZE='40878710'
+}
+buildtools=
+
+apply_local_patches() {
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+}
 
 if test -d ../"${name}.git"
 then
-	# Create and checkout the source directory
+	# Create and checkout the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		rm -f -- source/.git
 		ln -f -s -- ../../"${name}.git" source/.git
-		( cd source && git checkout -f "${version}" )
-		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -i ../"${patchfile}"
-		done
+		( cd source && git checkout -f "${gittag}" )
+		apply_local_patches
 	fi
 else
-	# Download the source
+	# Download the source.
 	if test \! -d dist/"${name}-${version}"/
 	then
 		install -d -m 0755 dist
@@ -34,10 +49,7 @@ else
 		Linux) fetch=tnftp ; FETCHARGS= ;;
 		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
-		extension='.tar.gz'
-		url='http://ftpmirror.gnu.org'/"${name}"/"${name}-${version}"/"${name}-${version}${extension}"
-		SHA256='36668eb1326d22e1466b94b3929beeafd10b9838bf3d41f4e5e3b52406ae69f1'
-		SIZE='40878710'
+		source_archive
 		archive="${name}-${version}${extension}"
 		(
 			cd dist
@@ -47,22 +59,16 @@ else
 			esac
 			pax -r -z < "${archive}"
 		)
-		# Cleanup bogus stuff in the source archive
-		# Force re-creation of the source directory.
+		# Force re-creation of the source directory..
 		rm -r -f -- source
 	fi
 
-	# Create and populate the source directory
+	# Create and populate the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -i ../"${patchfile}"
-		done
+		apply_local_patches
 	fi
 fi
 

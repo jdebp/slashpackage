@@ -10,25 +10,39 @@ name='unscii'
 version='2.1.1f'
 suffix=''
 gittag='2.1.1f'
+source_archive() {
+	extension='.tar.gz'
+	url='http://viznut.fi'/"${name}"/"${name}-${version}${suffix}${extension}"
+	SHA256='x'
+	SIZE='x'
+}
+buildtools="vtfontcvt"
+
+apply_local_patches() {
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+}
 
 if test -d ../"${name}.git"
 then
-	# Create and checkout the source directory
+	# Create and checkout the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		rm -f -- source/.git
 		ln -f -s -- ../../"${name}.git" source/.git
 		( cd source && git checkout -f "${gittag}" )
-		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -i ../"${patchfile}"
-		done
+		apply_local_patches
 	fi
 else
-	# Download the source
+	# Download the source.
 	if test \! -d dist/"${name}-${version}${suffix}"/
 	then
 		install -d -m 0755 dist
@@ -36,31 +50,26 @@ else
 		Linux) fetch=tnftp ; FETCHARGS= ;;
 		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
-		extension='.tar.gz'
-		url='http://viznut.fi'/"${name}"/"${name}-${version}${suffix}${extension}"
-		SHA256='x'
-		SIZE='x'
+		source_archive
 		archive="${name}-${version}${suffix}${extension}"
 		(
 			cd dist
 			test -r "${archive}" || "${fetch}" -o "${archive}" "${url}"
-			sha256 -c "${SHA256}" "${archive}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
 			pax -r -z < "${archive}"
 		)
+		# Force re-creation of the source directory.
 		rm -r -f -- source
 	fi
 
-	# Create and populate the source directory
+	# Create and populate the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		( cd dist/"${name}-${version}${suffix}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -i ../"${patchfile}"
-		done
+		apply_local_patches
 	fi
 fi
 
@@ -71,7 +80,7 @@ install -d -m 0755 build
 ( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
 
 # Check build command dependencies.
-for tool in vtfontcvt
+for tool in ${buildtools}
 do
 	if ! > /dev/null command -v "${tool}"
 	then

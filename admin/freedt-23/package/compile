@@ -9,25 +9,39 @@ fi
 name='freedt'
 version='23'
 gittag="v${version}"
+source_archive() {
+	extension='.tar.gz'
+	url='http://offog.org/files/'/"${name}-${version}${extension}"
+	SHA256='b0176d6f3c290f3d281804b61906b91f332801109ec8c991689c4113a028e42c'
+	SIZE='106539'
+}
+buildtools=
+
+apply_local_patches() {
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+}
 
 if test -d ../"${name}.git"
 then
-	# Create and checkout the source directory
+	# Create and checkout the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		rm -f -- source/.git
 		ln -f -s -- ../../"${name}.git" source/.git
 		( cd source && git checkout -f "${gittag}" )
-		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -i ../"${patchfile}"
-		done
+		apply_local_patches
 	fi
 else
-	# Download the source
+	# Download the source.
 	if test \! -d dist/"${name}-${version}"/
 	then
 		install -d -m 0755 dist
@@ -35,31 +49,26 @@ else
 		Linux) fetch=tnftp ; FETCHARGS= ;;
 		*BSD) fetch=ftp ; FETCHARGS= ;;
 		esac
-		extension='.tar.gz'
-		url='http://offog.org/files/'/"${name}-${version}${extension}"
-		SHA256='b0176d6f3c290f3d281804b61906b91f332801109ec8c991689c4113a028e42c'
-		SIZE='106539'
-		archive="${name}-${version}${extension}" 
-		( 
-			cd dist 
+		source_archive
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
 			"${fetch}" -o "${archive}" "${url}"
-			sha256 -c "${SHA256}" "${archive}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
 			pax -r -z < "${archive}"
 		)
+		# Force re-creation of the source directory.
 		rm -r -f -- source
 	fi
 
-	# Create and populate the source directory
+	# Create and populate the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		# Apply our patches
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -i ../"${patchfile}"
-		done
+		apply_local_patches
 	fi
 fi
 
