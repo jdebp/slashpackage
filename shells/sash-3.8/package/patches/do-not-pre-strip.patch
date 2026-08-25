@@ -1,0 +1,18 @@
+--- Makefile	2014-03-05 09:56:53.000000000 +0000
++++ Makefile	2026-08-25 14:07:21.606112011 +0100
+@@ -54,13 +54,12 @@
+ 
+ sash:	$(OBJS)
+ 	$(CC) $(LDFLAGS) -o sash $(OBJS) $(LIBS)
+-	strip sash
+ 
+ clean:
+ 	rm -f $(OBJS) sash
+ 
+ install: sash
+-	cp sash $(DESTDIR)/$(BINDIR)/sash
+-	cp sash.1 $(DESTDIR)/$(MANDIR)/man1/sash.1
++	install sash $(DESTDIR)/$(BINDIR)/sash
++	install sash.1 $(DESTDIR)/$(MANDIR)/man1/sash.1
+ 
+ $(OBJS):	sash.h

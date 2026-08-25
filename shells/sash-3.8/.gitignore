@@ -1,0 +1,7 @@
+build
+command
+manual
+source
+dist
+sash-*.tar.gz
+sash-*.tar.bz2

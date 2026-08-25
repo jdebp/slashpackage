@@ -1,0 +1,11 @@
+--- sash.h	2014-03-07 13:46:49.000000000 +0000
++++ sash.h	2026-08-25 13:59:23.707867727 +0100
+@@ -18,7 +18,7 @@
+ #include <time.h>
+ #include <ctype.h>
+ 
+-#if __OpenBSD__
++#if __OpenBSD__||__FreeBSD__||__NetBSD__||__DragonFlyBSD__
+ #include <sys/param.h>
+ #endif
+ 
