@@ -124,7 +124,7 @@ FreeBSD)
 esac
 (
 	cd build
-	test -r config.status || ./configure --prefix="${target}" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9
+	test -r config.status || ./configure --prefix="${target}" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/config/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9
 	case "`uname`" in
 	Linux) make='make' ;;
 	*) make='gmake' ;;
@@ -214,7 +214,7 @@ do
 	rm -f -- config/"${dest}"{new}
 	install -m 0644 -p -- "${fn}" config/"${dest}"{new}
 done
-sed -i -e 's:@runhelpdir@:'"${target}"'/help:' config/functions/Misc/run-help{new}
+sed -i -e 's:@runhelpdir@:'"${target}"'/config/help:' config/functions/Misc/run-help{new}
 find build/Completion/ -type d -maxdepth 1 |
 while read -r fndir
 do
