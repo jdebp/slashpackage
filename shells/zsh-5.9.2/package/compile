@@ -1,0 +1,361 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+name='zsh'
+version='5.9.2'
+gittag="v${version}"
+source_archive() {
+	extension='.tar.xz'
+	url='ftp://ftp.'"${name}"'.org/pub/'"${name}"'-'"${version}${extension}"
+	SHA256='36fa734374b44783582cec09bcd67822e2f992c779ec1624ab5596df078d2f81'
+	SIZE='3439480'
+}
+buildtools=
+
+apply_local_patches() {
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+	ln -f -s -- . source/Doc/man1
+	mv -- source/Doc/zshall.1 source/Doc/zshall.1.orig
+	soelim -I source/Doc source/Doc/zshall.1.orig > source/Doc/zshall.1
+}
+
+if test -d ../"${name}.git"
+then
+	# Create and checkout the source directory.
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		rm -f -- source/.git
+		ln -f -s -- ../../"${name}.git" source/.git
+		( cd source && git checkout -f "${gittag}" )
+		apply_local_patches
+	fi
+else
+	# Download the source.
+	if test \! -d dist/"${name}-${version}"/
+	then
+		install -d -m 0755 dist
+		case "`uname`" in
+		Linux) fetch=tnftp ; FETCHARGS= ;;
+		*) fetch=ftp ; FETCHARGS= ;;
+		esac
+		source_archive
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
+			"${fetch}" -o "${archive}" "${url}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
+			pax -r -z < "${archive}"
+		)
+		# Force re-creation of the source directory.
+		rm -r -f -- source
+	fi
+
+	# Create and populate the source directory.
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
+		apply_local_patches
+	fi
+fi
+
+export CDPATH=
+
+# Create and populate the build directory.
+install -d -m 0755 build
+( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+
+# Check build command dependencies.
+for tool in ${buildtools}
+do
+	if ! > /dev/null command -v "${tool}"
+	then
+		echo "${tool} is a required tool for building this package." 1>&2
+		exit 100
+	fi
+done
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	case "`uname`" in
+	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
+	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
+	esac
+	if > /dev/null expr "${cpus}" '>' 4
+	then
+		cpus=4
+	fi
+fi
+target="${PWD}"
+case "`uname`" in
+Linux)
+	pkgbase='/usr'
+	shrbase="${pkgbase}"/share/"${name}"
+	etcdir="${pkgbase}"/../etc/"${name}"
+	;;
+FreeBSD)
+	pkgbase='/usr/local'
+	shrbase="${pkgbase}"/share/"${name}"
+	etcdir="${pkgbase}"/etc/"${name}"
+	;;
+*)
+	pkgbase='/usr/pkg'
+	shrbase="${pkgbase}"/share/"${name}"
+	etcdir="${pkgbase}"/etc/"${name}"
+	;;
+esac
+(
+	cd build
+	test -r config.status || ./configure --prefix="${target}" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9
+	case "`uname`" in
+	Linux) make='make' ;;
+	*) make='gmake' ;;
+	esac
+	"${make}" ${cpus:+ -j "${cpus}"}
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual library library/param library/net config config/scripts config/functions config/help
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command, ./config, ./manual, and ./library.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		rm -f -- command/"$i"{new}
+		if objdump -f build/"$i" >/dev/null 2>&1
+		then
+			install -m 0755 -p -- build/Src/"$i" command/"$i"{new}
+			strip -p -- command/"$i"{new}
+			chmod 0555 command/"$i"{new}
+		else
+			install -m 0555 -p -- build/Src/"$i" command/"$i"{new}
+		fi
+	done
+	# All of the commands that have their own manual pages
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section}
+		rm -f -- manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/Doc/"$i".${section} manual/man${section}/"$i".${section}{new}
+	done
+	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section}
+		rm -f -- manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/Doc/"$i".${section} manual/man${section}/"$i".${section}{new}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for directory in en_GB.UTF-8 en.UTF-8
+do
+	rm -f -- manual/"${directory}"{new}
+	ln -f -s -- . manual/"${directory}"{new}
+done
+# All of the shared libraries
+test -r package/shared_libraries && cat package/shared_libraries |
+while read -r src dest
+do
+	rm -f -- library/"${dest}"{new}
+	install -m 0755 -p -- build/Src/"${src}" library/"${dest}"{new}
+	strip -p -- library/"${dest}"{new}
+	chmod 0555 library/"${dest}"{new}
+done
+# Symbolic links in place of subdirectories to fool the dynamic linking
+for directory in "${name}" "${version}"
+do
+	rm -f -- library/"${directory}"{new}
+	ln -f -s -- . library/"${directory}"{new}
+done
+# All of the scripts
+for script in build/Scripts/*
+do
+	dest=scripts/$(basename "${script}")
+	rm -f -- config/"${dest}"{new}
+	install -m 0755 -p -- "${script}" config/"${dest}"{new}
+done
+# All of the functions
+find build/Functions/ -type d |
+while read -r fndir
+do
+	destdir=functions/"${fndir##build/Functions/}"
+	install -d -m 0755 config/"${destdir}"
+done
+find build/Functions/ -type f \! -name '.*' |
+while read -r fn
+do
+	dest=functions/"${fn##build/Functions/}"
+	rm -f -- config/"${dest}"{new}
+	install -m 0644 -p -- "${fn}" config/"${dest}"{new}
+done
+sed -i -e 's:@runhelpdir@:'"${target}"'/help:' config/functions/Misc/run-help{new}
+find build/Completion/ -type d -maxdepth 1 |
+while read -r fndir
+do
+	destdir=functions/"${fndir##build/}"
+	install -d -m 0755 config/"${destdir}"
+done
+find build/Completion -type f \! -name '.*' |
+while read -r fn
+do
+	# The multiple-level source tree needs to be flattened to 1 sub-level.
+	rawname="${fn#build/Completion/}"
+	dirname="$(dirname "${rawname}")"
+	dirname="${dirname%%/*}"
+	dest=functions/Completion/"${dirname}"/"$(basename "${rawname}")"
+	rm -f -- config/"${dest}"{new}
+	install -m 0644 -p -- "${fn}" config/"${dest}"{new}
+done
+for dest in site-functions site-scripts
+do
+	rm -f -- config/"${dest}"{new}
+	ln -f -s -- "${shrbase}"/"${dest}" config/"${dest}"{new}
+done
+for dest in startup
+do
+	rm -f -- config/"${dest}"{new}
+	ln -f -s -- "${etcdir}" config/"${dest}"{new}
+done
+# All of the help
+find build/Doc/help/ -type f \! -name '.*' |
+while read -r fn
+do
+	dest="${fn##build/Doc/}"
+	rm -f -- config/"${dest}"{new}
+	install -m 0644 -p -- "${fn}" config/"${dest}"{new}
+done
+
+# ##############################################################################
+# Rename the ...{new} files in ./command, ./config, ./manual, and ./library.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		mv -f -- command/"$i"{new} command/"$i"
+	done
+	# All of the commands that have their own manual pages
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+	done
+	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for directory in en_GB.UTF-8 en.UTF-8
+do
+	case "`uname`" in
+	Linux)
+		test -e manual/"${directory}" && mv -f -- manual/"${directory}" manual/"${directory}"{old}
+		mv -f -- manual/"${directory}"{new} manual/"${directory}"
+		rm -f -- manual/"${directory}"{old}
+		;;
+	*)
+		mv -f -h -- manual/"${directory}"{new} manual/"${directory}"
+		;;
+	esac
+done
+# All of the shared libraries
+test -r package/shared_libraries && cat package/shared_libraries |
+while read -r src dest
+do
+	mv -f -- library/"${dest}"{new} library/"${dest}"
+done
+# Symbolic links in place of subdirectories to fool the dynamic linking
+for directory in "${name}" "${version}"
+do
+	case "`uname`" in
+	Linux)
+		test -e library/"${directory}" && mv -f -- library/"${directory}" library/"${directory}"{old}
+		mv -f -- library/"${directory}"{new} library/"${directory}"
+		rm -f -- library/"${directory}"{old}
+		;;
+	*)
+		mv -f -h -- library/"${directory}"{new} library/"${directory}"
+		;;
+	esac
+done
+# All of the scripts
+for script in build/Scripts/*
+do
+	dest=scripts/$(basename "${script}")
+	mv -f -- config/"${dest}"{new} config/"${dest}"
+done
+# All of the functions
+find build/Functions/ -type f \! -name '.*' |
+while read -r fn
+do
+	dest=functions/"${fn##build/Functions/}"
+	mv -f -- config/"${dest}"{new} config/"${dest}"
+done
+find build/Completion/ -type f \! -name '.*' |
+while read -r fn
+do
+	# The multiple-level source tree needs to be flattened to 1 sub-level.
+	rawname="${fn#build/Completion/}"
+	dirname="$(dirname "${rawname}")"
+	dirname="${dirname%%/*}"
+	dest=functions/Completion/"${dirname}"/"$(basename "${rawname}")"
+	mv -f -- config/"${dest}"{new} config/"${dest}"
+done
+for dest in site-functions site-scripts startup
+do
+	case "`uname`" in
+	Linux)
+		test -e config/"${dest}" && mv -f -- config/"${dest}" config/"${dest}"{old}
+		mv -f -- config/"${dest}"{new} config/"${dest}"
+		mv -f -- config/"${dest}"{new} config/"${dest}"
+		;;
+	*)
+		mv -f -h -- config/"${dest}"{new} config/"${dest}"
+		;;
+	esac
+done
+# All of the help
+find build/Doc/help/ -type f \! -name '.*' |
+while read -r fn
+do
+	dest="${fn##build/Doc/}"
+	mv -f -- config/"${dest}"{new} config/"${dest}"
+done
+
+# ##############################################################################
+# Generate .zwc files as an optimization.
+find config/functions config/functions/Completion -mindepth 1 -maxdepth 2 -type d |
+while read -r dir
+do
+	build/Src/zsh -df -c 'zcompile -U -M "'"${dir}"'"{new}.zwc '"$(find "${dir}" -type f \! \( -name '.*' -o -name 'README*' -o -name '*.zwc' \)|tr '\n' ' ')"
+	mv -f -- "${dir}"'{new}'.zwc "${dir}"'.zwc'
+done
