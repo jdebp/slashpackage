@@ -127,7 +127,7 @@ FreeBSD)
 esac
 (
 	cd build
-	test -r config.status || ./configure --prefix="${target}" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/config/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9
+	test -r config.status || ./configure --prefix="${target}" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/config/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9 --enable-cppflags='-isystem /usr/pkg/include' --enable-ldflags='-L /usr/pkg/lib'
 	case "`uname`" in
 	Linux) make='make' ;;
 	*) make='gmake' ;;
@@ -185,6 +185,10 @@ done
 test -r package/shared_libraries && cat package/shared_libraries |
 while read -r src dest
 do
+	if > /dev/null expr "${dest}" : 'curses.so' && ! test -r build/Src/"${src}"
+	then
+		continue
+	fi
 	rm -f -- library/"${dest}"{new}
 	install -m 0755 -p -- build/Src/"${src}" library/"${dest}"{new}
 	strip -p -- library/"${dest}"{new}
@@ -294,6 +298,10 @@ done
 test -r package/shared_libraries && cat package/shared_libraries |
 while read -r src dest
 do
+	if > /dev/null expr "${dest}" : 'curses.so' && ! test -r library/"${dest}"{new}
+	then
+		continue
+	fi
 	mv -f -- library/"${dest}"{new} library/"${dest}"
 done
 # Symbolic links in place of subdirectories to fool the dynamic linking
