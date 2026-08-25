@@ -60,7 +60,10 @@ else
 			case "`uname`" in
 			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
 			esac
-			pax -r -z < "${archive}"
+			case "`uname`" in
+			Linux)	xz -dc "${archive}" | pax -r ;;
+			*)	pax -r -z < "${archive}" ;;
+			esac
 		)
 		# Force re-creation of the source directory.
 		rm -r -f -- source
@@ -215,7 +218,7 @@ do
 	install -m 0644 -p -- "${fn}" config/"${dest}"{new}
 done
 sed -i -e 's:@runhelpdir@:'"${target}"'/config/help:' config/functions/Misc/run-help{new}
-find build/Completion/ -type d -maxdepth 1 |
+find build/Completion/ -maxdepth 1 -type d |
 while read -r fndir
 do
 	destdir=functions/"${fndir##build/}"
@@ -336,7 +339,7 @@ do
 	Linux)
 		test -e config/"${dest}" && mv -f -- config/"${dest}" config/"${dest}"{old}
 		mv -f -- config/"${dest}"{new} config/"${dest}"
-		mv -f -- config/"${dest}"{new} config/"${dest}"
+		rm -f -- config/"${dest}"{old}
 		;;
 	*)
 		mv -f -h -- config/"${dest}"{new} config/"${dest}"
