@@ -1,0 +1,7 @@
+build
+command
+dist
+manual
+source
+dash-*.tar.gz
+dash-*.tar.bz2

@@ -7,11 +7,12 @@ then
 fi
 
 name='dash'
+git_name='dash-xu'
 version='0.5.13.5'
 gittag="v${version}"
 source_archive() {
 	extension='.tar.gz'
-	url='https://git.kernel.org/pub/scm/utils/'"${name}"'/'"${name}"'.git/snapshot/'"${name}"'-'"${version}${extension}"
+	url='http://git.kernel.org/pub/scm/utils/'"${name}"'/'"${name}"'.git/snapshot/'"${name}"'-'"${version}${extension}"
 	SHA256='x'
 	SIZE='x'
 }
@@ -29,14 +30,14 @@ apply_local_patches() {
 	fi
 }
 
-if test -d ../"${name}.git"
+if test -d ../"${git_name}.git"
 then
 	# Create and checkout the source directory.
 	if test \! -d source
 	then
 		install -d -m 0755 source
 		rm -f -- source/.git
-		ln -f -s -- ../../"${name}.git" source/.git
+		ln -f -s -- ../../"${git_name}.git" source/.git
 		( cd source && git checkout -f "${gittag}" )
 		apply_local_patches
 	fi

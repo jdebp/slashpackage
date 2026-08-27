@@ -1,7 +1,6 @@
 build
 command
-config
-guide
+dist
 manual
 source
 dash-*.tar.gz
