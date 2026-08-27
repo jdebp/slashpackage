@@ -1,0 +1,25 @@
+diff --git src/var.c src/var.c
+index e76abe3..f9693d8 100644
+--- src/var.c
++++ src/var.c
+@@ -75,7 +75,12 @@ struct localvar_list {
+ MKINIT struct localvar_list *localvar_stack;
+ 
+ const char defpathvar[] =
++#ifdef HAVE_PATHS_H
++	"PATH="	_PATH_STDPATH;
++#else
+ 	"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
++#endif
++const char defdash_version_var[] = "DASH_VERSION=" VERSION;
+ char defifsvar[] = "IFS= \t\n";
+ MKINIT char defoptindvar[] = "OPTIND=1";
+ 
+@@ -113,6 +118,7 @@ struct var varinit[] = {
+ 	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LC_CTYPE\0", changelocale },
+ 	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LC_NUMERIC\0", changelocale },
+ 	{ 0,	VSTRFIXED|VTEXTFIXED|VFULL|VUNSET, "LANG\0",	changelocale },
++	{ 0,	VSTRFIXED|VTEXTFIXED,	defdash_version_var,	0 },
+ };
+ 
+ STATIC struct var *vartab[VTABSIZE];

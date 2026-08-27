@@ -1,0 +1,23 @@
+--- src/var.c.orig	2026-08-27 18:14:28.549581070 +0100
++++ src/var.c	2026-08-27 18:14:28.421581072 +0100
+@@ -74,7 +74,12 @@
+ MKINIT struct localvar_list *localvar_stack;
+ 
+ const char defpathvar[] =
++#ifdef HAVE_PATHS_H
++	"PATH="	_PATH_STDPATH;
++#else
+ 	"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
++#endif
++const char defdash_version_var[] = "DASH_VERSION=" VERSION;
+ char defifsvar[] = "IFS= \t\n";
+ MKINIT char defoptindvar[] = "OPTIND=1";
+ 
+@@ -101,6 +106,7 @@
+ 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"TERM\0",	0 },
+ 	{ 0,	VSTRFIXED|VTEXTFIXED|VUNSET,	"HISTSIZE\0",	sethistsize },
+ #endif
++	{ 0,	VSTRFIXED|VTEXTFIXED,	defdash_version_var,	0 },
+ };
+ 
+ STATIC struct var *vartab[VTABSIZE];
