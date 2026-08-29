@@ -1,0 +1,31 @@
+diff --git xmlto.in xmlto.in
+index d5a81a8..cda8a2b 100755
+--- xmlto.in
++++ xmlto.in
+@@ -19,7 +19,7 @@
+ # Utilities that we need that aren't everywhere
+ FIND=@FIND@               # This must be GNU find (need -maxdepth)
+ MKTEMP=@MKTEMP@           # See http://www.mktemp.org if missing on your system
+-BASH=@XMLTO_BASH_PATH@    # GNU bash, for running the format scripts
++SH=@XMLTO_BASH_PATH@      # SUS conformant sh, for running the format scripts
+ GETOPT=@GETOPT@           # a getopt that supports --longoptions
+ TAIL=@TAIL@               # a tail that supports -n (posix)
+ GREP=@GREP@               # GNU grep, for searching patterns
+@@ -498,7 +499,7 @@ export PDFXMLTEX_PATH
+ export USE_BACKEND
+ if [ -z "$STYLESHEET" ]
+ then
+-  STYLESHEET="$(${BASH} "$FORMAT" stylesheet)" || exit 1
++  STYLESHEET="$(${SH} "$FORMAT" stylesheet)" || exit 1
+   [ "$VERBOSE" -ge 1 ] && echo >&2 "Stylesheet: ${STYLESHEET}"
+ fi
+ 
+@@ -653,6 +654,6 @@ export SEARCHPATH
+ if [ "$VERBOSE" -gt 2 ]
+ then
+   # Extremely verbose
+-  BASH="${BASH} -x"
++  SH="${SH} -x"
+ fi
+-${BASH} "$FORMAT" post-process || exit 1
++${SH} "$FORMAT" post-process || exit 1

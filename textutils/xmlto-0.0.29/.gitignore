@@ -1,0 +1,8 @@
+build
+command
+config
+dist
+manual
+source
+xmlto-*.tar.gz
+xmlto-*.tar.bz2

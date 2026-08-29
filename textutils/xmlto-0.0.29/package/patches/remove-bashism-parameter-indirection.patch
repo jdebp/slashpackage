@@ -1,0 +1,22 @@
+diff --git xmlto.in xmlto.in
+index d5a81a8..19f8444 100755
+--- xmlto.in
++++ xmlto.in
+@@ -78,13 +78,14 @@ EOF
+ #  * Remembers the temporary file's name so it can be deleted on exit
+ #  * If the failure message is empty or missing, exits on failure
+ make_temp () {
+-  local dirflag="" prefix="@PACKAGE@"
++  local dirflag="" prefix="@PACKAGE@" file
+   [ "$1" = "-d" ] && { dirflag="-d"; shift; }
+   [ -n "$1" ] && prefix="@PACKAGE@-$1"
+ 
+-  if eval $2='$(${MKTEMP} $dirflag "${TMPDIR:-/tmp}/${prefix}.XXXXXX")'
++  if file="$(${MKTEMP} $dirflag "${TMPDIR:-/tmp}/${prefix}.XXXXXX")" &&
++  eval $2="${file}"
+   then
+-    CLEANFILES="$CLEANFILES ${!2}"
++    CLEANFILES="$CLEANFILES ${file}"
+     return 0
+   elif [ -z "$3" ]
+   then

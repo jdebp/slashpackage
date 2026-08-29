@@ -1,0 +1,233 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+name='xmlto'
+git_name="${name}"
+version='0.0.29'
+gittag="${version}"
+source_archive() {
+	extension='.tar.gz'
+	url='http://releases.pagure.org/'"${name}"'/'"${name}"'-'"${version}${extension}"
+	SHA256='x'
+	SIZE='x'
+}
+buildtools="aclocal autoheader automake autoconf"
+
+apply_local_patches() {
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+}
+
+if test -d ../"${git_name}.git"
+then
+	# Create and checkout the source directory.
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		rm -f -- source/.git
+		ln -f -s -- ../../"${git_name}.git" source/.git
+		( cd source && git checkout -f "${gittag}" )
+		apply_local_patches
+	fi
+else
+	# Download the source.
+	if test \! -d dist/"${name}-${version}"/
+	then
+		install -d -m 0755 dist
+		case "`uname`" in
+		Linux) fetch=tnftp ; FETCHARGS= ;;
+		*BSD) fetch=ftp ; FETCHARGS= ;;
+		esac
+		source_archive
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
+			"${fetch}" -o "${archive}" "${url}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
+			pax -r -z < "${archive}"
+		)
+		# Force re-creation of the source directory.
+		rm -r -f -- source
+	fi
+
+	# Create and populate the source directory.
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
+		apply_local_patches
+	fi
+fi
+
+export CDPATH=
+
+# Create and populate the build directory.
+install -d -m 0755 build
+( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+
+# Check build command dependencies.
+for tool in ${buildtools}
+do
+	if ! > /dev/null command -v "${tool}"
+	then
+		echo "${tool} is a required tool for building this package." 1>&2
+		exit 100
+	fi
+done
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	case "`uname`" in
+	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
+	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
+	esac
+	if > /dev/null expr "${cpus}" '>' 4
+	then
+		cpus=4
+	fi
+fi
+target="${PWD}"
+(
+	cd build
+	test -r aclocal.m4 || aclocal
+	test -r configure || autoconf
+	test -r install-sh || automake --add-missing --foreign
+	test -r config.status || XMLTO_BASH_PATH="$(command -v sh)" ./configure --datarootdir="${target}"/config --with-webbrowser=www-browser
+	case "`uname`" in
+	Linux) make='make' ;;
+	*) make='gmake' ;;
+	esac
+	"${make}" ${cpus:+ -j "${cpus}"}
+)
+
+# Atomically update the release directories ./command, ./config, ./manual, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual config
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		rm -f -- command/"$i"{new}
+		if objdump -f build/"$i"/"$i" >/dev/null 2>&1
+		then
+			install -m 0755 -p -- build/"$i"/"$i" command/"$i"{new}
+			strip -p -- command/"$i"{new}
+			chmod 0555 command/"$i"{new}
+		elif test -f build/"$i"
+		then
+			install -m 0555 -p -- build/"$i" command/"$i"{new}
+		fi
+	done
+	# All of the commands that have their own manual pages
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section} manual/docbook${section}
+		rm -f -- manual/man${section}/"$i".${section}{new} manual/docbook${section}/"$i".xml{new}
+		install -m 0444 -p -- build/man/man${section}/"$i".${section} manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/doc/"$i".xml manual/docbook${section}/"$i".xml{new}
+	done
+	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section} manual/docbook${section}
+		rm -f -- manual/man${section}/"$i".${section}{new} manual/docbook${section}/"$i".xml{new}
+		install -m 0444 -p -- build/man/man${section}/"$i".${section} manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/doc/"$i".xml manual/docbook${section}/"$i".xml{new}
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for link in en_GB.UTF-8 en.UTF-8
+do
+	rm -f -- manual/"${link}"{new}
+	ln -f -s -- . manual/"${link}"{new}
+done
+# format and make files
+install -d -m 0755 config/format{new}
+(
+	cd build/format
+	pax -r -w -p a * ../../config/format{new}
+)
+find config/format{new}/ -name '*.orig' -delete
+for file in xmlto.mak
+do
+	rm -f -- config/"${file}"{new}
+	install -m 0444 -p -- build/"${file}" config/"${file}"{new}
+done
+for link in xmlto
+do
+	rm -f -- config/"${link}"{new}
+	ln -f -s -- . config/"${link}"{new}
+done
+
+# ##############################################################################
+# Rename the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		mv -f -- command/"$i"{new} command/"$i"
+	done
+	# All of the commands that have their own manual pages
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+		mv -f -- manual/docbook${section}/"$i".xml{new} manual/docbook${section}/"$i".xml
+	done
+	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+		mv -f -- manual/docbook${section}/"$i".xml{new} manual/docbook${section}/"$i".xml
+	done
+done
+# Symbolic links in place of subdirectories to fool the man(1) command
+for link in en_GB.UTF-8 en.UTF-8
+do
+	test -e manual/"${link}" && mv -f -- manual/"${link}" manual/"${link}"{old}
+	mv -f -- manual/"${link}"{new} manual/"${link}"
+	rm -f -- manual/"${link}"{old}
+done
+# format and make files
+for directory in format
+do
+	test -e config/"${directory}" && mv -f -- config/"${directory}" config/"${directory}"{old}
+	mv -f -- config/"${directory}"{new} config/"${directory}"
+	rm -f -r -- config/"${directory}"{old}
+done
+for file in xmlto.mak
+do
+	mv -f -- config/"${file}"{new} config/"${file}"
+done
+for link in xmlto
+do
+	test -e config/"${link}" && mv -f -- config/"${link}" config/"${link}"{old}
+	mv -f -- config/"${link}"{new} config/"${link}"
+	rm -f -- config/"${link}"{old}
+done

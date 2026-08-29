@@ -1,0 +1,180 @@
+diff --git format/docbook/epub format/docbook/epub
+index 118d605..7951ebf 100755
+--- format/docbook/epub
++++ format/docbook/epub
+@@ -1,4 +1,4 @@
+-if [ -z "`type -t $ZIP_PATH`" ]
++if ! command -v "$ZIP_PATH" > /dev/null
+ then
+   echo >&2 "Missing zip utility at $ZIP_PATH, conversion to epub not possible."
+   echo >&2 "Exiting !"
+diff --git format/docbook/txt format/docbook/txt
+index fe42a1f..c867d03 100755
+--- format/docbook/txt
++++ format/docbook/txt
+@@ -1,14 +1,14 @@
+ case "$USE_BACKEND" in
+ DEFAULT|DBLATEX)
+-	if [ -n "`type -t $W3M_PATH`" ]
++	if command -v "$W3M_PATH" > /dev/null
+ 	then
+ 	  CONVERT="$W3M_PATH"
+ 	  ARGS="-T text/html -dump"
+-	elif [ -n "`type -t $LYNX_PATH`" ]
++	elif command -v "$LYNX_PATH" > /dev/null
+ 	then
+ 	  CONVERT="$LYNX_PATH"
+ 	  ARGS="-force_html -dump -nolist -width=72"
+-	elif [ -n "`type -t $LINKS_PATH`" ]
++	elif command -v "$LINKS_PATH" > /dev/null
+ 	then
+ 	  CONVERT="$LINKS_PATH"
+ 	  ARGS="-dump"
+diff --git format/fo/dvi format/fo/dvi
+index 6615048..1c0e2e9 100755
+--- format/fo/dvi
++++ format/fo/dvi
+@@ -6,7 +6,7 @@ post-process)
+   then
+     echo >&2 "Post-process XSL-FO to DVI"
+   fi
+-  if [ -z "`type -t $XMLTEX_PATH`" ]
++  if ! command -v "$XMLTEX_PATH" > /dev/null
+   then
+     echo >&2 "Can't process, xmltex tool not found at $XMLTEX_PATH."
+     exit 3
+diff --git format/fo/pdf format/fo/pdf
+index 9e586b3..f17ba0f 100755
+--- format/fo/pdf
++++ format/fo/pdf
+@@ -8,7 +8,7 @@ DEFAULT|DBLATEX)
+ 	  then
+ 	    echo >&2 "Post-process XSL-FO to PDF"
+ 	  fi
+-	  if [ -z "`type -t $PDFXMLTEX_PATH`" ]
++	  if ! command -v "$PDFXMLTEX_PATH" > /dev/null
+ 	  then
+ 	    echo >&2 "Can't process, pdfxmltex tool not found at $PDFXMLTEX_PATH."
+ 	    exit 3
+diff --git format/xhtml1/txt format/xhtml1/txt
+index eb1c07a..baecaa0 100755
+--- format/xhtml1/txt
++++ format/xhtml1/txt
+@@ -1,14 +1,14 @@
+ case "$USE_BACKEND" in
+ DEFAULT|DBLATEX)
+-  if [ -n "`type -t $W3M_PATH`" ]
++  if command -v "$W3M_PATH" > /dev/null
+   then
+     CONVERT="$W3M_PATH"
+     ARGS="-T text/html -dump"
+-  elif [ -n "`type -t $LYNX_PATH`" ]
++  elif command -v "$LYNX_PATH" > /dev/null
+   then
+     CONVERT="$LYNX_PATH"
+     ARGS="-force_html -dump -nolist -width=72"
+-  elif [ -n "`type -t $LINKS_PATH`" ]
++  elif command -v "$LINKS_PATH" > /dev/null
+   then
+     CONVERT="$LINKS_PATH"
+     ARGS="-dump"
+diff --git xmlto.in xmlto.in
+index d5a81a8..facad4a 100755
+--- xmlto.in
++++ xmlto.in
+@@ -145,7 +145,7 @@ XMLLINT_PATH=@XMLLINT@
+ XSLTPROC_PATH=@XSLTPROC@
+ 
+ # Try to setup papersize using libpaper first ...
+-if type "$PAPERCONF_PATH" >/dev/null 2>&1
++if command -v "$PAPERCONF_PATH" >/dev/null 2>&1
+ then
+   papername=`"$PAPERCONF_PATH" -n`
+   paperheight=`"$PAPERCONF_PATH" -mh | sed 's/ //g'`
+@@ -176,7 +176,7 @@ EOF
+   fi
+ 
+ # ... or use magic paper size, based on LC_PAPER
+-elif type "$LOCALE_PATH" >/dev/null 2>&1
++elif command -v "$LOCALE_PATH" >/dev/null 2>&1
+ then
+   # For paper sizes we know about, specify them.
+   h=$("$LOCALE_PATH" LC_PAPER 2>/dev/null | head -n 1)
+@@ -199,7 +199,7 @@ EOF
+ fi
+ 
+ # Magic encoding, based on locale
+-if type "$LOCALE_PATH" >/dev/null 2>&1
++if command -v "$LOCALE_PATH" >/dev/null 2>&1
+ then
+   charmap=$("$LOCALE_PATH" charmap 2>/dev/null)
+ 
+@@ -249,12 +249,12 @@ XMLTEX_PATH=@XMLTEX@
+ PDFXMLTEX_PATH=@PDFXMLTEX@
+ 
+ #check if we could use fop/dblatex backend as default(if not, use passivetex)
+-if [ x"$USE_BACKEND" = xFOP ] && ! type "$FOP_PATH" >/dev/null 2>&1
++if [ x"$USE_BACKEND" = xFOP ] && ! command -v "$FOP_PATH" >/dev/null 2>&1
+ then
+   echo >&2 "@PACKAGE@: Warning: fop not found or not executable."
+   echo >&2 "@PACKAGE@: Using default backend..."
+   USE_BACKEND=DEFAULT
+-elif type "$FOP_PATH" >/dev/null 2>&1
++elif command -v "$FOP_PATH" >/dev/null 2>&1
+ then
+   # we should enable fop.extensions for fop 0_17,0_18 and 0_20*,
+   # fop1.extensions for the rest
+@@ -265,7 +265,7 @@ then
+   fi
+ fi
+ if [ x"$USE_BACKEND" = xDBLATEX ] && \
+-   ! type "$DBLATEX_PATH" >/dev/null 2>&1
++   ! command -v "$DBLATEX_PATH" >/dev/null 2>&1
+ then
+   echo >&2 "@PACKAGE@: Warning: dblatex not found or not executable."
+   echo >&2 "@PACKAGE@: Using default backend..."
+@@ -315,7 +315,7 @@ while [ "$#" -gt "0" ]; do
+ 	;;
+   -o)
+ 	OUTPUT_DIR="$2"
+-	if type -p cygpath >/dev/null; then
++	if command -v cygpath >/dev/null; then
+ 		OUTPUT_DIR=$(cygpath "$OUTPUT_DIR")
+ 	fi
+ 	case "$OUTPUT_DIR" in
+@@ -371,7 +371,7 @@ while [ "$#" -gt "0" ]; do
+   ;;
+   --with-fop)
+ 	##use fop instead of passivetex where possible
+-	if ! type "$FOP_PATH" >/dev/null 2>&1
++	if ! command -v "$FOP_PATH" >/dev/null 2>&1
+ 	then
+ 		echo >&2 Warning: fop not found or not executable.
+ 		echo >&2 Using default backend...
+@@ -382,7 +382,7 @@ while [ "$#" -gt "0" ]; do
+ 	;;
+   --with-dblatex)
+ 	##use dblatex instead of passivetex where possible
+-	if ! type "$DBLATEX_PATH" >/dev/null 2>&1
++	if ! command -v "$DBLATEX_PATH" >/dev/null 2>&1
+ 	then
+ 		echo >&2 Warning: dblatex not found or not executable.
+ 		echo >&2 Using default backend...
+@@ -536,7 +536,7 @@ cd "$XSLT_PROCESSED_DIR"
+ if [ "$SKIP_VALIDATION" -eq 0 ] && [ "$SOURCE_FORMAT" != "fo" ]
+ then
+   #do we have xmllint validation tool?
+-  if ! type "$XMLLINT_PATH" >/dev/null 2>&1
++  if ! command -v "$XMLLINT_PATH" >/dev/null 2>&1
+   then
+     echo >&2 "@PACKAGE@: xmllint validation tool not found or not executable."
+     echo >&2 "@PACKAGE@: Skipping validation... " \
+@@ -572,7 +572,7 @@ XSLTOPTS="${XSLTPARAMS} ${XSLTOPTS}"
+ if [ "$PROFILE" -eq 1 ] || [ -n "${STYLESHEET}" ]
+ then
+   #do we have xsltproc tool?
+-  if ! type "$XSLTPROC_PATH" >/dev/null 2>&1
++  if ! command -v "$XSLTPROC_PATH" >/dev/null 2>&1
+   then
+     echo >&2 "@PACKAGE@: Can't continue, xsltproc tool not found or not executable."
+     exit 3
