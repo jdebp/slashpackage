@@ -1,0 +1,15 @@
+diff --git assemble.pl assemble.pl
+index d97c332..4ddb46c 100755
+--- assemble.pl
++++ assemble.pl
+@@ -45,8 +45,8 @@ sub dumpfont
+   }
+   $p='';
+   if($patch) { $p='-'.$patch; }
+-  open(F8,">unscii-8$p.hex") if($do8x8);
+-  open(F16,">unscii-16$p.hex") if($do8x16);
++  open(F8,">fontfiles/unscii-8$p.hex") if($do8x8);
++  open(F16,">fontfiles/unscii-16$p.hex") if($do8x16);
+ 
+   print F8 "00000:00000000000000000000000000000000\n" if($do8x8);
+   print F16 "00000:00000000000000000000000000000000\n" if($do8x16);
