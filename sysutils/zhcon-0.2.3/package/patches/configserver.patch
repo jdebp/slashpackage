@@ -1,0 +1,11 @@
+--- src/configserver.cpp	2002-05-12 04:58:27.000000000 +0100
++++ src/configserver.cpp	2026-08-31 19:03:11.857171178 +0100
+@@ -78,7 +78,7 @@
+ }
+ 
+ void ConfigServer::GetInputBuf(char * pBuf, int len) {
+-    pBuf = '\0';
++    *pBuf = '\0';
+ }
+ 
+ string ConfigServer::GetServerType() {
