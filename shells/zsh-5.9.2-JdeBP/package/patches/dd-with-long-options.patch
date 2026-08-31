@@ -1,0 +1,14 @@
+--- Completion/Unix/Command/_dd	2026-07-12 08:09:18.000000000 +0100
++++ Completion/Unix/Command/_dd	2026-08-31 07:42:08.622191898 +0100
+@@ -98,4 +98,11 @@
+   ;;
+ esac
+ 
++case $variant in
++  freebsd*)
++    _arguments -A '--*' -s '--help[Display option help]' --
++  ;|
++  *)
+ _values -w 'option' $vals
++  ;;
++esac
