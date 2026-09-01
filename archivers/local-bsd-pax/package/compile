@@ -1,0 +1,131 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
+buildtools=
+
+apply_local_changes() {
+	local file
+	if test -d package/patches
+	then
+		find package/patches -name '*.1' |
+		while read -r file
+		do
+			test -r source/"$(basename "${file}")" || cp -p -- "${file}" source/
+		done
+	fi
+}
+
+if test -d /usr/src/bin/pax
+then
+	# Create and checkout the source directory.
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		source="${PWD}"/source
+		( cd /usr/src/bin/pax && (2>/dev/null pax -w -r -l -u -- * "${source}" || true ) )
+		apply_local_modifications
+	fi
+else
+	echo "/usr/src/bin/pax does not exist." 1>&2
+	exit 100
+fi
+
+export CDPATH=
+
+uses_bsd_make
+check_buildtools
+clone_source_to_build
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	calculate_make_cpus
+fi
+(
+	cd build
+	"${make}" ${cpus:+ -j "${cpus}"}
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		rm -f -- command/"$i"{new}
+		if objdump -f build/"$i" >/dev/null 2>&1
+		then
+			install -m 0755 -p -- build/"$i" command/"$i"{new}
+			strip -p -- command/"$i"{new}
+			chmod 0555 command/"$i"{new}
+		else
+			install -m 0555 -p -- build/"$i" command/"$i"{new}
+		fi
+	done
+	# All of the commands that have their own manual pages
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section}
+		rm -f -- manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/"$i".${section} manual/man${section}/"$i".${section}{new}
+	done
+	test -r package/aliases${section} && cat package/aliases${section} |
+	while read -r command alias
+	do
+		ln -f -- command/"${command}"{new} command/"${alias}"{new}
+	done
+	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section}
+		rm -f -- manual/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/"$i".${section} manual/man${section}/"$i".${section}{new}
+	done
+done
+collapse_utf8_man_0
+
+# ##############################################################################
+# Rename the ...{new} files in ./command and ./manual.
+for section in 1 2 3 4 5 6 7 8 9
+do
+	# All of the commands that have executables
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		mv -f -- command/"$i"{new} command/"$i"
+	done
+	# All of the commands that have their own manual pages
+	test -r package/commands${section} && cat package/commands${section} |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+	done
+	test -r package/aliases${section} && cat package/aliases${section} |
+	while read -r command alias
+	do
+		mv -f -- command/"${alias}"{new} command/"${alias}"
+	done
+	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
+	while read -r i
+	do
+		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
+	done
+done
+collapse_utf8_man_1
