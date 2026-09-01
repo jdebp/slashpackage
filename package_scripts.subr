@@ -1,0 +1,219 @@
+#!/bin/sh -e
+# Handy subroutine library for package/compile scripts.
+# vim: ft=sh:
+make_symbolic_link() {
+	rm -f -- "$2"
+	ln -f -s -- "$1" "$2"
+}
+uses_gnu_autotools_sans_autoreconf() {
+	buildtools="${buildtools} autoconf autoheader automake aclocal"
+	auto_reconfigure() {
+		test -r aclocal.m4 || aclocal
+		test -r config.h.in || autoheader
+		test -r configure || autoconf
+		test -r install-sh || automake --add-missing ${automake_options}
+	}
+}
+uses_gnu_autotools() {
+	uses_gnu_autotools_sans_autoreconf
+	if autoreconf="$(command -v autoreconf)"
+	then
+		auto_reconfigure() {
+			"${autoreconf}" --install --symlink --verbose
+		}
+	fi
+}
+make='make'
+uses_bsd_make() {
+	case "`uname`" in
+	Linux) make='bmake' ;;
+	*) make='make' ;;
+	esac
+	buildtools="${buildtools} ${make}"
+}
+uses_gnu_make() {
+	case "`uname`" in
+	Linux) make='make' ;;
+	*) make='gmake' ;;
+	esac
+	buildtools="${buildtools} ${make}"
+}
+calculate_make_cpus() {
+	case "`uname`" in
+	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
+	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
+	esac
+	if > /dev/null expr "${cpus}" '>' 4
+	then
+		cpus=4
+	fi
+}
+apply_local_patches() {
+	local patchfile
+	# Apply our patches.
+	if test -d package/patches
+	then
+		find package/patches -name '*.patch' |
+		while read -r patchfile
+		do
+			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
+		done
+	fi
+}
+apply_local_changes() {
+	:
+}
+apply_local_modifications() {
+	apply_local_patches
+	apply_local_changes
+}
+cleanup_source_from_git() {
+	:
+}
+cleanup_dist_from_archive() {
+	:
+}
+fetch_or_checkout_source() {
+	if test -d ../"${name}.git"
+	then
+		# Create and checkout the source directory.
+		if test \! -d source
+		then
+			install -d -m 0755 source
+			rm -f -- source/.git
+			ln -f -s -- ../../"${name}.git" source/.git
+			( cd source && git checkout -f "${gittag}" )
+			apply_local_modifications
+			cleanup_source_from_git
+		fi
+	else
+		# Download the source.
+		if ! test -d dist/"${name}-${version}"/
+		then
+			install -d -m 0755 dist
+			case "`uname`" in
+			Linux) ftp=tnftp ;;
+			*BSD) ftp=ftp ;;
+			esac
+			source_archive
+			archive="${name}-${version}${extension}"
+			(
+				cd dist
+				"${ftp}" -o "${archive}" "${url}"
+				case "`uname`" in
+				FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+				esac
+				case "${extension}" in
+				*.xz)
+					case "`uname`" in
+					Linux)	< "${archive}" pax -r -J ;;
+					NetBSD)	< "${archive}" pax -r --xz ;;
+					*)	< "${archive}" xz -dc | pax -r ;;
+					esac
+				;;
+				*.bz2)
+					case "`uname`" in
+					Linux)	< "${archive}" pax -r -j ;;
+					NetBSD)	< "${archive}" pax -r -j ;;
+					*)	< "${archive}" bzip2 -dc | pax -r ;;
+					esac
+				;;
+				*.gz)
+					case "`uname`" in
+					Linux)		< "${archive}" pax -r -z ;;
+					NetBSD|FreeBSD)	< "${archive}" pax -r -z ;;
+					*)		< "${archive}" gzip -dc | pax -r ;;
+					esac
+				;;
+				*)
+					< "${archive}" pax -r
+				;;
+				esac
+			)
+			if ! test -d dist/"${name}-${version}"/
+			then
+				if test -d dist/"${name}"/
+				then
+					make_symbolic_link "${name}" dist/"${name}-${version}"
+				elif test -n "${dirname}" && test -d dist/"${dirname}"/
+				then
+					make_symbolic_link "${dirname}" dist/"${name}-${version}"
+				fi
+			fi
+			cleanup_dist_from_archive
+			# Force re-creation of the source directory.
+			rm -r -f -- source
+		fi
+
+		# Create and populate the source directory.
+		if test \! -d source
+		then
+			install -d -m 0755 source
+			( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
+			apply_local_modifications
+		fi
+	fi
+}
+check_buildtools() {
+	local tool
+	# Check build command dependencies.
+	for tool in ${buildtools}
+	do
+		if ! > /dev/null command -v "${tool}"
+		then
+			echo "${tool} is a required tool for building this package." 1>&2
+			exit 100
+		fi
+	done
+}
+clone_source_to_build() {
+	# Create and populate the build directory.
+	install -d -m 0755 build
+	( cd source && (2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
+}
+case "`uname`" in
+Linux)
+	rename_symbolic_link() {
+		test -e "$2" && mv -f -- "$2" "$2"{old}
+		mv -f -- "$1" "$2"
+		rm -f -- "$2"{old}
+	}
+	;;
+*)
+	rename_symbolic_link() {
+		mv -f -h -- "$1" "$2"
+	}
+	;;
+esac
+collapse_utf8_man_0() {
+	# Symbolic links in place of subdirectories to fool the man(1) command
+	for directory in en_GB.UTF-8 en.UTF-8
+	do
+		make_symbolic_link . manual/"${directory}"{new}
+	done
+	for directory in ja_JP.UTF-8 ja.UTF-8
+	do
+		make_symbolic_link ja manual/"${directory}"{new}
+	done
+}
+collapse_utf8_man_1() {
+	# Symbolic links in place of subdirectories to fool the man(1) command
+	for directory in en_GB.UTF-8 en.UTF-8 ja_JP.UTF-8 ja.UTF-8
+	do
+		rename_symbolic_link manual/"${directory}"{new} manual/"${directory}"
+	done
+}
+slashpackage_target() {
+	local isa opsys release
+	case "`uname`" in
+	Linux)
+		isa="$(uname -m|sed -e 's/amd64/x86_64/')"
+		;;
+	*)
+		isa="$(uname -p|sed -e 's/amd64/x86_64/')"
+		;;
+	esac
+	opsys="$(uname -s|tr '[[:upper:]]' '[[:lower:]]')"
+	release="$(uname -r|sed -E -e 's/([[:digit:]]+\.[[:digit:]]+).*$/\1/')"
+	printf '%s-%s-%s%s\n' "${isa}" 'slashpackage' "${opsys}" "${release}"
+}

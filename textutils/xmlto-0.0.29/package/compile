@@ -6,6 +6,8 @@ then
 	exit 100
 fi
 
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
 name='xmlto'
 git_name="${name}"
 version='0.0.29'
@@ -16,103 +18,29 @@ source_archive() {
 	SHA256='x'
 	SIZE='x'
 }
-buildtools="aclocal autoheader automake autoconf"
+buildtools=
 
-apply_local_patches() {
-	# Apply our patches.
-	if test -d package/patches
-	then
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
-		done
-	fi
-}
-
-if test -d ../"${git_name}.git"
-then
-	# Create and checkout the source directory.
-	if test \! -d source
-	then
-		install -d -m 0755 source
-		rm -f -- source/.git
-		ln -f -s -- ../../"${git_name}.git" source/.git
-		( cd source && git checkout -f "${gittag}" )
-		apply_local_patches
-	fi
-else
-	# Download the source.
-	if test \! -d dist/"${name}-${version}"/
-	then
-		install -d -m 0755 dist
-		case "`uname`" in
-		Linux) fetch=tnftp ; FETCHARGS= ;;
-		*BSD) fetch=ftp ; FETCHARGS= ;;
-		esac
-		source_archive
-		archive="${name}-${version}${extension}"
-		(
-			cd dist
-			"${fetch}" -o "${archive}" "${url}"
-			case "`uname`" in
-			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
-			esac
-			pax -r -z < "${archive}"
-		)
-		# Force re-creation of the source directory.
-		rm -r -f -- source
-	fi
-
-	# Create and populate the source directory.
-	if test \! -d source
-	then
-		install -d -m 0755 source
-		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		apply_local_patches
-	fi
-fi
+fetch_or_checkout_source
 
 export CDPATH=
 
-# Create and populate the build directory.
-install -d -m 0755 build
-( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
-
-# Check build command dependencies.
-for tool in ${buildtools}
-do
-	if ! > /dev/null command -v "${tool}"
-	then
-		echo "${tool} is a required tool for building this package." 1>&2
-		exit 100
-	fi
-done
+uses_gnu_autotools_sans_autoreconf
+uses_gnu_make
+check_buildtools
+clone_source_to_build
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
    ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
 then
-	case "`uname`" in
-	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
-	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
-	esac
-	if > /dev/null expr "${cpus}" '>' 4
-	then
-		cpus=4
-	fi
+	calculate_make_cpus
 fi
 target="${PWD}"
 (
 	cd build
-	test -r aclocal.m4 || aclocal
-	test -r configure || autoconf
-	test -r install-sh || automake --add-missing --foreign
-	test -r config.status || XMLTO_BASH_PATH="$(command -v sh)" ./configure --datarootdir="${target}"/config --with-webbrowser=www-browser
-	case "`uname`" in
-	Linux) make='make' ;;
-	*) make='gmake' ;;
-	esac
+	automake_options="--foreign"
+	auto_reconfigure
+	test -r config.status || XMLTO_BASH_PATH="$(command -v sh)" sh ./configure --datarootdir="${target}"/config --with-webbrowser=www-browser
 	"${make}" ${cpus:+ -j "${cpus}"}
 )
 
@@ -159,12 +87,7 @@ do
 		install -m 0444 -p -- build/doc/"$i".xml manual/docbook${section}/"$i".xml{new}
 	done
 done
-# Symbolic links in place of subdirectories to fool the man(1) command
-for link in en_GB.UTF-8 en.UTF-8
-do
-	rm -f -- manual/"${link}"{new}
-	ln -f -s -- . manual/"${link}"{new}
-done
+collapse_utf8_man_0
 # format and make files
 install -d -m 0755 config/format{new}
 (
@@ -179,8 +102,7 @@ do
 done
 for link in xmlto
 do
-	rm -f -- config/"${link}"{new}
-	ln -f -s -- . config/"${link}"{new}
+	make_symbolic_link . config/"${link}"{new}
 done
 
 # ##############################################################################
@@ -207,13 +129,7 @@ do
 		mv -f -- manual/docbook${section}/"$i".xml{new} manual/docbook${section}/"$i".xml
 	done
 done
-# Symbolic links in place of subdirectories to fool the man(1) command
-for link in en_GB.UTF-8 en.UTF-8
-do
-	test -e manual/"${link}" && mv -f -- manual/"${link}" manual/"${link}"{old}
-	mv -f -- manual/"${link}"{new} manual/"${link}"
-	rm -f -- manual/"${link}"{old}
-done
+collapse_utf8_man_1
 # format and make files
 for directory in format
 do
@@ -227,7 +143,5 @@ do
 done
 for link in xmlto
 do
-	test -e config/"${link}" && mv -f -- config/"${link}" config/"${link}"{old}
-	mv -f -- config/"${link}"{new} config/"${link}"
-	rm -f -- config/"${link}"{old}
+	rename_symbolic_link config/"${link}"{new} config/"${link}"
 done

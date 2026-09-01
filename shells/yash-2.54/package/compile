@@ -6,6 +6,8 @@ then
 	exit 100
 fi
 
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
 name='yash'
 version='2.54'
 gittag="${version}"
@@ -17,105 +19,37 @@ source_archive() {
 }
 buildtools="asciidoc xgettext"
 
-apply_local_patches() {
-	# Apply our patches.
-	if test -d package/patches
-	then
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
-		done
-	fi
+cleanup_dist_from_archive() {
+	# Cleanup bogus stuff in the source archive.
+	find dist/"${name}-${version}"/ -name \*.d -delete
+	find dist/"${name}-${version}"/doc/ -name \*.html -delete
+	find dist/"${name}-${version}"/po/ -name \*.mo -delete
+	rm -f dist/"${name}-${version}"/po/en@boldquot.ih
+	rm -f dist/"${name}-${version}"/po/en@boldquot.po
+	rm -f dist/"${name}-${version}"/po/en@quot.ih
+	rm -f dist/"${name}-${version}"/po/en@quot.po
+	rm -f dist/"${name}-${version}"/po/yash.pot
+	rm -f dist/"${name}-${version}"/po/stamp-po
+	rm -f dist/"${name}-${version}"/doc/yash.1
+	rm -f dist/"${name}-${version}"/doc/yash.txt
+	rm -f dist/"${name}-${version}"/doc/index.txt
+	rm -f dist/"${name}-${version}"/doc/ja/yash.1
+	rm -f dist/"${name}-${version}"/doc/ja/yash.txt
+	rm -f dist/"${name}-${version}"/doc/ja/index.txt
 }
 
-if test -d ../"${name}.git"
-then
-	# Create and checkout the source directory.
-	if test \! -d source
-	then
-		install -d -m 0755 source
-		rm -f -- source/.git
-		ln -f -s -- ../../"${name}.git" source/.git
-		( cd source && git checkout -f "${gittag}" )
-		apply_local_patches
-	fi
-else
-	# Download the source.
-	if test \! -d dist/"${name}-${version}"/
-	then
-		install -d -m 0755 dist
-		case "`uname`" in
-		Linux) fetch=tnftp ; FETCHARGS= ;;
-		*BSD) fetch=ftp ; FETCHARGS= ;;
-		esac
-		source_archive
-		archive="${name}-${version}${extension}"
-		(
-			cd dist
-			"${fetch}" -o "${archive}" "${url}"
-			case "`uname`" in
-			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
-			esac
-			pax -r -z < "${archive}"
-		)
-		# Cleanup bogus stuff in the source archive.
-		find dist/"${name}-${version}"/ -name \*.d -delete
-		find dist/"${name}-${version}"/doc/ -name \*.html -delete
-		find dist/"${name}-${version}"/po/ -name \*.mo -delete
-		rm -f dist/"${name}-${version}"/po/en@boldquot.ih
-		rm -f dist/"${name}-${version}"/po/en@boldquot.po
-		rm -f dist/"${name}-${version}"/po/en@quot.ih
-		rm -f dist/"${name}-${version}"/po/en@quot.po
-		rm -f dist/"${name}-${version}"/po/yash.pot
-		rm -f dist/"${name}-${version}"/po/stamp-po
-		rm -f dist/"${name}-${version}"/doc/yash.1
-		rm -f dist/"${name}-${version}"/doc/yash.txt
-		rm -f dist/"${name}-${version}"/doc/index.txt
-		rm -f dist/"${name}-${version}"/doc/ja/yash.1
-		rm -f dist/"${name}-${version}"/doc/ja/yash.txt
-		rm -f dist/"${name}-${version}"/doc/ja/index.txt
-		# Force re-creation of the source directory.
-		rm -r -f -- source
-	fi
-
-	# Create and populate the source directory.
-	if test \! -d source
-	then
-		install -d -m 0755 source
-		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		apply_local_patches
-	fi
-fi
+fetch_or_checkout_source
 
 export CDPATH=
 
-# Create and populate the build directory.
-install -d -m 0755 build
-( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
-
-# Check build command dependencies.
-for tool in ${buildtools}
-do
-	if ! > /dev/null command -v "${tool}"
-	then
-		echo "${tool} is a required tool for building this package." 1>&2
-		exit 100
-	fi
-done
+check_buildtools
+clone_source_to_build
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
    ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
 then
-	case "`uname`" in
-	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
-	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
-	esac
-	if > /dev/null expr "${cpus}" '>' 4
-	then
-		cpus=4
-	fi
+	calculate_make_cpus
 fi
 (
 	cd build
@@ -185,17 +119,7 @@ do
 	install -m 0444 -p -- build/doc/"$i".html guide/"$i".html{new}
 	install -m 0444 -p -- build/doc/ja/"$i".html guide/ja/"$i".html{new}
 done
-# Symbolic links in place of subdirectories to fool the man(1) command
-for directory in en_GB.UTF-8 en.UTF-8
-do
-	rm -f -- manual/"${directory}"{new}
-	ln -f -s -- . manual/"${directory}"{new}
-done
-for directory in ja_JP.UTF-8 ja.UTF-8
-do
-	rm -f -- manual/"${directory}"{new}
-	ln -f -s -- ja manual/"${directory}"{new}
-done
+collapse_utf8_man_0
 
 # ##############################################################################
 # Rename the ...{new} files in ./command and ./manual.
@@ -237,13 +161,7 @@ do
 	mv -f -- guide/"$i".html{new} guide/"$i".html
 	mv -f -- guide/ja/"$i".html{new} guide/ja/"$i".html
 done
-# Symbolic links in place of subdirectories to fool the man(1) command
-for directory in en_GB.UTF-8 en.UTF-8 ja_JP.UTF-8 ja.UTF-8
-do
-	test -e manual/"${directory}" && mv -f -- manual/"${directory}" manual/"${directory}"{old}
-	mv -f -- manual/"${directory}"{new} manual/"${directory}"
-	rm -f -- manual/"${directory}"{old}
-done
+collapse_utf8_man_1
 
 # ##############################################################################
 # Build all of the ...{new} files in ./config.

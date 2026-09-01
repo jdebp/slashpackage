@@ -6,6 +6,8 @@ then
 	exit 100
 fi
 
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
 name='zsh'
 version='5.9.2'
 gittag="v${version}"
@@ -17,95 +19,25 @@ source_archive() {
 }
 buildtools=
 
-apply_local_patches() {
-	# Apply our patches.
-	if test -d package/patches
-	then
-		find package/patches -name '*.patch' |
-		while read -r patchfile
-		do
-			patch -t -N -d source/ -p 0 -i ../"${patchfile}"
-		done
-	fi
+apply_local_changes() {
 	ln -f -s -- . source/Doc/man1
 	mv -- source/Doc/zshall.1 source/Doc/zshall.1.orig
 	soelim -I source/Doc source/Doc/zshall.1.orig > source/Doc/zshall.1
 }
 
-if test -d ../"${name}.git"
-then
-	# Create and checkout the source directory.
-	if test \! -d source
-	then
-		install -d -m 0755 source
-		rm -f -- source/.git
-		ln -f -s -- ../../"${name}.git" source/.git
-		( cd source && git checkout -f "${gittag}" )
-		apply_local_patches
-	fi
-else
-	# Download the source.
-	if test \! -d dist/"${name}-${version}"/
-	then
-		install -d -m 0755 dist
-		case "`uname`" in
-		Linux) fetch=tnftp ; FETCHARGS= ;;
-		*) fetch=ftp ; FETCHARGS= ;;
-		esac
-		source_archive
-		archive="${name}-${version}${extension}"
-		(
-			cd dist
-			"${fetch}" -o "${archive}" "${url}"
-			case "`uname`" in
-			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
-			esac
-			case "`uname`" in
-			Linux)	xz -dc "${archive}" | pax -r ;;
-			*)	pax -r -z < "${archive}" ;;
-			esac
-		)
-		# Force re-creation of the source directory.
-		rm -r -f -- source
-	fi
-
-	# Create and populate the source directory.
-	if test \! -d source
-	then
-		install -d -m 0755 source
-		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-		apply_local_patches
-	fi
-fi
+fetch_or_checkout_source
 
 export CDPATH=
 
-# Create and populate the build directory.
-install -d -m 0755 build
-( cd source && ( 2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
-
-# Check build command dependencies.
-for tool in ${buildtools}
-do
-	if ! > /dev/null command -v "${tool}"
-	then
-		echo "${tool} is a required tool for building this package." 1>&2
-		exit 100
-	fi
-done
+uses_gnu_make
+check_buildtools
+clone_source_to_build
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
    ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
 then
-	case "`uname`" in
-	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
-	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
-	esac
-	if > /dev/null expr "${cpus}" '>' 4
-	then
-		cpus=4
-	fi
+	calculate_make_cpus
 fi
 target="${PWD}"
 case "`uname`" in
@@ -127,11 +59,7 @@ FreeBSD)
 esac
 (
 	cd build
-	test -r config.status || ./configure --prefix="${target}" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/config/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9 --enable-cppflags='-isystem /usr/pkg/include' --enable-ldflags='-L /usr/pkg/lib'
-	case "`uname`" in
-	Linux) make='make' ;;
-	*) make='gmake' ;;
-	esac
+	test -r config.status || sh ./configure --prefix="${target}" --build="$(slashpackage_target)" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/config/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9 --enable-cppflags='-isystem /usr/pkg/include' --enable-ldflags='-L /usr/pkg/lib'
 	"${make}" ${cpus:+ -j "${cpus}"}
 )
 
@@ -150,7 +78,7 @@ do
 	while read -r i
 	do
 		rm -f -- command/"$i"{new}
-		if objdump -f build/"$i" >/dev/null 2>&1
+		if objdump -f build/Src/"$i" >/dev/null 2>&1
 		then
 			install -m 0755 -p -- build/Src/"$i" command/"$i"{new}
 			strip -p -- command/"$i"{new}
@@ -175,12 +103,7 @@ do
 		install -m 0444 -p -- build/Doc/"$i".${section} manual/man${section}/"$i".${section}{new}
 	done
 done
-# Symbolic links in place of subdirectories to fool the man(1) command
-for directory in en_GB.UTF-8 en.UTF-8
-do
-	rm -f -- manual/"${directory}"{new}
-	ln -f -s -- . manual/"${directory}"{new}
-done
+collapse_utf8_man_0
 # All of the shared libraries
 test -r package/shared_libraries && cat package/shared_libraries |
 while read -r src dest
@@ -194,11 +117,11 @@ do
 	strip -p -- library/"${dest}"{new}
 	chmod 0555 library/"${dest}"{new}
 done
+collapse_utf8_man_0
 # Symbolic links in place of subdirectories to fool the dynamic linking
 for directory in "${name}" "${version}"
 do
-	rm -f -- library/"${directory}"{new}
-	ln -f -s -- . library/"${directory}"{new}
+	make_symbolic_link . library/"${directory}"{new}
 done
 # All of the scripts
 for script in build/Scripts/*
@@ -249,6 +172,7 @@ do
 	rm -f -- config/"${dest}"{new}
 	ln -f -s -- "${etcdir}" config/"${dest}"{new}
 done
+collapse_utf8_man_0
 # All of the help
 find build/Doc/help/ -type f \! -name '.*' |
 while read -r fn
@@ -280,20 +204,7 @@ do
 		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
 	done
 done
-# Symbolic links in place of subdirectories to fool the man(1) command
-for directory in en_GB.UTF-8 en.UTF-8
-do
-	case "`uname`" in
-	Linux)
-		test -e manual/"${directory}" && mv -f -- manual/"${directory}" manual/"${directory}"{old}
-		mv -f -- manual/"${directory}"{new} manual/"${directory}"
-		rm -f -- manual/"${directory}"{old}
-		;;
-	*)
-		mv -f -h -- manual/"${directory}"{new} manual/"${directory}"
-		;;
-	esac
-done
+collapse_utf8_man_1
 # All of the shared libraries
 test -r package/shared_libraries && cat package/shared_libraries |
 while read -r src dest
@@ -307,16 +218,7 @@ done
 # Symbolic links in place of subdirectories to fool the dynamic linking
 for directory in "${name}" "${version}"
 do
-	case "`uname`" in
-	Linux)
-		test -e library/"${directory}" && mv -f -- library/"${directory}" library/"${directory}"{old}
-		mv -f -- library/"${directory}"{new} library/"${directory}"
-		rm -f -- library/"${directory}"{old}
-		;;
-	*)
-		mv -f -h -- library/"${directory}"{new} library/"${directory}"
-		;;
-	esac
+	rename_symbolic_link library/"${directory}"{new} library/"${directory}"
 done
 # All of the scripts
 for script in build/Scripts/*
