@@ -1,0 +1,11 @@
+--- Build.sh.orig	2026-09-01 03:45:25.477066334 +0100
++++ Build.sh	2026-09-01 03:46:16.401062679 +0100
+@@ -595,7 +595,7 @@
+ midipix)
+ 	add_cppflags -D_GNU_SOURCE
+ 	;;
+-MidnightBSD)
++MidnightBSD|FreeBSD|DragonFlyBSD)
+ 	add_cppflags -D_WITH_DPRINTF
+ 	add_cppflags -DUT_NAMESIZE=32
+ 	;;
