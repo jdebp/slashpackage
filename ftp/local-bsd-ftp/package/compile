@@ -1,0 +1,67 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if ! test -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
+buildtools=
+
+apply_local_changes() {
+	root=$(pwd|sed -E -e 's:[/"'\'']:\\&:g')
+	sed -i -E -e 's/TNFTP[[:space:]]*=[[:space:]]*.*$/TNFTP='"${root}"'\/source/g' source/Makefile
+}
+
+# Create and checkout the source directory.
+if ! test -d source
+then
+	install -d -m 0755 source
+	source="${PWD}"/source
+	( cd /usr/src/usr.bin/ftp && (2>/dev/null pax -w -r -l -u -p a -- * "${source}" || true ) )
+	if test -d /usr/src/contrib/tnftp
+	then
+		( cd /usr/src/contrib/tnftp && (2>/dev/null pax -w -r -l -u -p a -- * "${source}" || true ) )
+	fi
+	apply_local_modifications
+fi
+
+export CDPATH=
+
+uses_bsd_make
+check_buildtools
+clone_source_to_build
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	calculate_make_cpus
+fi
+(
+	cd build
+	"${make}" ${cpus:+ -j "${cpus}"}
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command and ./manual.
+if test -d build/src
+then
+	install_commands_and_manuals_0 . src
+else
+	install_commands_and_manuals_0 . .
+fi
+collapse_utf8_man_0
+
+# ##############################################################################
+# Rename the ...{new} files in ./command and ./manual.
+install_commands_and_manuals_1
+collapse_utf8_man_1
