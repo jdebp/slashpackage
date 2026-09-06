@@ -1,0 +1,125 @@
+--- ../dist/tnftp-20260211/configure.ac	2026-02-10 20:41:27.000000000 +0000
++++ ./configure.ac	2026-09-06 07:09:31.694970946 +0100
+@@ -2,8 +2,8 @@
+ #
+ # Process this file with autoconf to produce a configure script.
+ 
+-AC_INIT([tnftp], [20260211], [lukem@NetBSD.org])
+-AC_PREREQ([2.69])
++AC_INIT([tnftp],[20260211],[lukem@NetBSD.org])
++AC_PREREQ([2.72])
+ 
+ AC_COPYRIGHT([
+ Copyright (c) 1999-2026 The NetBSD Foundation, Inc.
+@@ -91,7 +91,7 @@
+ AC_PROG_CC()
+ AC_PROG_AWK()
+ AM_PROG_AR()
+-AC_PROG_LIBTOOL()
++AC_PROG_LIBTOOL([])
+ 
+ #
+ # Checks for tool features.
+@@ -193,21 +193,13 @@
+ #if defined(HAVE_SYS_STAT_H)
+ # include <sys/stat.h>
+ #endif
+-#if defined(STDC_HEADERS)
+-# include <stdarg.h>
+-# include <stdlib.h>
+-# include <string.h>
+-#endif
+-#if defined(TIME_WITH_SYS_TIME)
++#include <stdarg.h>
++#include <stdlib.h>
++#include <string.h>
++#if defined(HAVE_SYS_TIME_H)
+ # include <sys/time.h>
+-# include <time.h>
+-#else
+-# if defined(HAVE_SYS_TIME_H)
+-#  include <sys/time.h>
+-# else
+-#  include <time.h>
+-# endif
+ #endif
++#include <time.h>
+ #if defined(HAVE_LIBGEN_H)
+ # include <libgen.h>
+ #endif
+@@ -266,8 +258,13 @@
+ AC_HEADER_DIRENT()
+ AC_HEADER_RESOLV()
+ AC_HEADER_STAT()
+-AC_HEADER_STDC()
+-AC_HEADER_TIME()
++# Autoupdate added the next two lines to ensure that your configure
++# script's behavior did not change.  They are probably safe to remove.
++AC_CHECK_INCLUDES_DEFAULT
++AC_PROG_EGREP
++
++AC_CHECK_HEADERS_ONCE([sys/time.h])
++
+ AC_HEADER_TIOCGWINSZ()
+ AC_CHECK_HEADERS([arpa/ftp.h arpa/inet.h arpa/nameser.h err.h \
+                   fcntl.h libgen.h limits.h locale.h malloc.h \
+@@ -489,7 +486,7 @@
+         src/Makefile
+ ])
+ 
+-AC_OUTPUT()
++AC_OUTPUT
+ 
+ # Display feature results.
+ #
+--- ../dist/tnftp-20260211/tnftp_config.h.in	2026-02-10 20:41:53.000000000 +0000
++++ ./tnftp_config.h.in	2026-09-06 07:05:08.974974329 +0100
+@@ -460,12 +460,6 @@
+ /* Define to 1 if the `S_IS*' macros in <sys/stat.h> do not work properly. */
+ #undef STAT_MACROS_BROKEN
+ 
+-/* Define to 1 if you have the ANSI C header files. */
+-#undef STDC_HEADERS
+-
+-/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
+-#undef TIME_WITH_SYS_TIME
+-
+ /* Define to 1 if your <sys/time.h> declares `struct tm'. */
+ #undef TM_IN_SYS_TIME
+ 
+--- ../dist/tnftp-20260211/tnftp.h	2026-02-10 19:41:22.000000000 +0000
++++ ./tnftp.h	2026-09-06 07:09:29.178970979 +0100
+@@ -16,11 +16,9 @@
+ #if defined(HAVE_SYS_TYPES_H)
+ # include <sys/types.h>
+ #endif
+-#if defined(STDC_HEADERS)
+-# include <stdarg.h>
+-# include <stdlib.h>
+-# include <string.h>
+-#endif
++#include <stdarg.h>
++#include <stdlib.h>
++#include <string.h>
+ #if defined(HAVE_LIBGEN_H)
+ # include <libgen.h>
+ #endif
+@@ -155,16 +153,10 @@
+ };
+ #endif
+ 
+-#if defined(TIME_WITH_SYS_TIME)
++#if defined(HAVE_SYS_TIME_H)
+ # include <sys/time.h>
+-# include <time.h>
+-#else
+-# if defined(HAVE_SYS_TIME_H)
+-#  include <sys/time.h>
+-# else
+-#  include <time.h>
+-# endif
+ #endif
++#include <time.h>
+ 
+ #if defined(HAVE_ERR_H)
+ # include <err.h>

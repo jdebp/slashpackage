@@ -1,0 +1,7 @@
+build
+command
+dist
+manual
+source
+tnftp-*.tar.gz
+tnftp-*.tar.bz2

@@ -1,0 +1,58 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
+name='tnftp'
+version='20260211'
+source_archive() {
+	extension='.tar.gz'
+	url='ftp://ftp.NetBSD.org/pub/NetBSD/misc/'"${name}"'/'"${name}"'-'"${version}${extension}"
+	SHA256='101cda6927e5de4338ad9d4b264304d7d15d6a78b435968a7b95093e0a2efe03'
+	SIZE='x'
+}
+buildtools=
+
+fetch_or_checkout_source
+
+export CDPATH=
+
+uses_gnu_make
+uses_gnu_autotools
+check_buildtools
+clone_source_to_build
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	calculate_make_cpus
+fi
+(
+	cd build
+	export CFLAGS=-O2
+	auto_reconfigure
+	test -r config.status || sh ./configure --build="$(slashpackage_target)" --enable-ssl=auto
+	"${make}" ${cpus:+ -j "${cpus}"}
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command and ./manual.
+install_commands_and_manuals_0 src src
+collapse_utf8_man_0
+
+# ##############################################################################
+# Rename the ...{new} files in ./command and ./manual.
+install_commands_and_manuals_1
+collapse_utf8_man_1
