@@ -1,0 +1,326 @@
+--- src/dd.c.orig	2026-03-12 21:22:39.000000000 +0000
++++ src/dd.c	2026-09-07 14:00:51.883755695 +0100
+@@ -17,6 +17,7 @@
+ /* Written by Paul Rubin, David MacKenzie, and Stuart Kemp. */
+ 
+ #include <config.h>
++#include <getopt.h>
+ 
+ #include <sys/types.h>
+ #include <signal.h>
+@@ -28,7 +29,6 @@
+ #include "gethrxtime.h"
+ #include "human.h"
+ #include "ioblksize.h"
+-#include "long-options.h"
+ #include "quote.h"
+ #include "xstrtol.h"
+ #include "xtime.h"
+@@ -39,7 +39,8 @@
+ #define AUTHORS \
+   proper_name ("Paul Rubin"), \
+   proper_name ("David MacKenzie"), \
+-  proper_name ("Stuart Kemp")
++  proper_name ("Stuart Kemp"), \
++  proper_name ("Jonathan de Boyne Pollard")
+ 
+ /* NonStop circa 2011 lacks SA_RESETHAND; see Bug#9076.  */
+ #ifndef SA_RESETHAND
+@@ -516,6 +517,42 @@
+   va_end (ap);
+ }
+ 
++/* For long options that have no equivalent short option, use a
++   non-character as a pseudo short option, starting with CHAR_MAX + 1.  */
++enum
++{
++  CONV_OPTION = CHAR_MAX + 1,
++  IFLAG_OPTION,
++  OFLAG_OPTION,
++  STATUS_OPTION,
++  BS_OPTION,
++  CBS_OPTION,
++};
++
++static char const short_options[] = "n:r:w:i:I:o:O:";
++
++static struct option const long_options[] =
++{
++  {"of", required_argument, NULL, 'o'},
++  {"if", required_argument, NULL, 'i'},
++  {"iseek", required_argument, NULL, 'I'},
++  {"skip", required_argument, NULL, 'I'},
++  {"oseek", required_argument, NULL, 'O'},
++  {"seek", required_argument, NULL, 'O'},
++  {"count", required_argument, NULL, 'n'},
++  {"ibs", required_argument, NULL, 'r'},
++  {"obs", required_argument, NULL, 'w'},
++  {"conv", required_argument, NULL, CONV_OPTION},
++  {"iflag", required_argument, NULL, IFLAG_OPTION},
++  {"oflag", required_argument, NULL, OFLAG_OPTION},
++  {"status", required_argument, NULL, STATUS_OPTION},
++  {"bs", required_argument, NULL, BS_OPTION},
++  {"cbs", required_argument, NULL, CBS_OPTION},
++  {GETOPT_HELP_OPTION_DECL},
++  {GETOPT_VERSION_OPTION_DECL},
++  {NULL, 0, NULL, 0}
++};
++
+ void
+ usage (int status)
+ {
+@@ -656,6 +693,58 @@
+ "), SIGINFO == SIGUSR1 ? "USR1" : "INFO");
+       }
+ 
++      oputs (_("\
++  --bs BYTES\n\
++same as the bs operand\n\
++"));
++      oputs (_("\
++  --cbs BYTES\n\
++same as the cbs operand\n\
++"));
++      oputs (_("\
++  --conv CONVS\n\
++same as the conv operand\n\
++"));
++      oputs (_("\
++  -n, --count N\n\
++same as the count operand\n\
++"));
++      oputs (_("\
++  -r, --ibs BYTES\n\
++same as the ibs operand\n\
++"));
++      oputs (_("\
++  -i, --if FILE\n\
++same as the if operand\n\
++"));
++      oputs (_("\
++  --iflag FLAGS\n\
++same as the iflag operand\n\
++"));
++      oputs (_("\
++  -w, --obs BYTES\n\
++same as the obs operand\n\
++"));
++      oputs (_("\
++  -o, --of FILE\n\
++same as the of operand\n\
++"));
++      oputs (_("\
++  --oflag FLAGS\n\
++same as the oflag operand\n\
++"));
++      oputs (_("\
++  -I, --seek FF\n\
++same as the seek operand\n\
++"));
++      oputs (_("\
++  -O, --skip FF\n\
++same as the skip operand\n\
++"));
++      oputs (_("\
++  --status LEVEL\n\
++same as the status operand\n\
++"));
+       oputs (HELP_OPTION_DESCRIPTION);
+       oputs (VERSION_OPTION_DESCRIPTION);
+       emit_ancillary_info (PROGRAM_NAME);
+@@ -1474,7 +1563,131 @@
+ }
+ 
+ static void
+-scanargs (int argc, char *const *argv)
++sanitize_operands (idx_t * p_blocksize, intmax_t * p_count,
++		  intmax_t * p_skip, intmax_t * p_seek,
++		  bool * p_count_B, bool * p_skip_B, bool * p_seek_B);
++
++static int
++scanargs_getopt (int argc, char **argv)
++{
++  idx_t blocksize = 0;
++  intmax_t count = INTMAX_MAX;
++  intmax_t skip = 0;
++  intmax_t seek = 0;
++  bool count_B = false, skip_B = false, seek_B = false;
++  /* Maximum blocksize.  Keep it smaller than IDX_MAX, so that
++     it fits into blocksize vars even if 1 is added for conv=swab.
++     Do not exceed SSIZE_MAX, for the benefit of system calls
++     like "read".  And do not exceed OFF_T_MAX, for the
++     benefit of the large-offset seek code.  */
++  idx_t max_blocksize = MIN (IDX_MAX - 1, MIN (SSIZE_MAX, OFF_T_MAX));
++
++  int optc, seen_getopt = 0;
++  while ((optc = getopt_long (argc, argv, short_options, long_options, NULL))
++         != -1)
++    {
++      char const *val = optarg;
++      strtol_error invalid = LONGINT_OK;
++      intmax_t n;
++      bool has_B;
++      intmax_t n_min = 0;
++      intmax_t n_max = INTMAX_MAX;
++      idx_t *converted_idx = NULL;
++
++      seen_getopt = 1;
++      switch (optc)
++        {
++	case 'i':
++	  input_file = val;
++	  break;
++	case 'o':
++	  output_file = val;
++	  break;
++	case CONV_OPTION:
++	  conversions_mask |= parse_symbols (val, conversions, false,
++					     N_("invalid conversion"));
++	  break;
++	case IFLAG_OPTION:
++	  input_flags |= parse_symbols (val, flags, false,
++					N_("invalid input flag"));
++	  break;
++	case OFLAG_OPTION:
++	  output_flags |= parse_symbols (val, flags, false,
++					 N_("invalid output flag"));
++	  break;
++	case STATUS_OPTION:
++	  status_level = parse_symbols (val, statuses, true,
++					N_("invalid status level"));
++	  break;
++	numeric_common:
++          if (n < n_min)
++            invalid = LONGINT_INVALID;
++          else if (n_max < n)
++            invalid = LONGINT_OVERFLOW;
++
++          if (invalid != LONGINT_OK)
++            error (EXIT_FAILURE, invalid == LONGINT_OVERFLOW ? EOVERFLOW : 0,
++                   "%s: %s", _("invalid number"), quoteaf (val));
++          else if (converted_idx)
++            *converted_idx = n;
++	  break;
++	case 'r':
++          n = parse_integer (val, &invalid);
++          has_B = !!strchr (val, 'B');
++	  n_min = 1;
++	  n_max = max_blocksize;
++	  converted_idx = &input_blocksize;
++	  goto numeric_common;
++	case 'w':
++          n = parse_integer (val, &invalid);
++          has_B = !!strchr (val, 'B');
++	  n_min = 1;
++	  n_max = max_blocksize;
++	  converted_idx = &output_blocksize;
++	  goto numeric_common;
++	case 'I':
++          n = parse_integer (val, &invalid);
++          has_B = !!strchr (val, 'B');
++	  skip = n;
++	  skip_B = has_B;
++	  goto numeric_common;
++	case 'O':
++          n = parse_integer (val, &invalid);
++          has_B = !!strchr (val, 'B');
++	  seek = n;
++	  seek_B = has_B;
++	  goto numeric_common;
++	case 'n':
++          n = parse_integer (val, &invalid);
++          has_B = !!strchr (val, 'B');
++	  count = n;
++	  count_B = has_B;
++	  goto numeric_common;
++	case BS_OPTION:
++          n = parse_integer (val, &invalid);
++          has_B = !!strchr (val, 'B');
++	  n_min = 1;
++	  n_max = max_blocksize;
++	  converted_idx = &blocksize;
++	  goto numeric_common;
++	case CBS_OPTION:
++	  n_min = 1;
++	  n_max = MIN (SIZE_MAX, IDX_MAX);
++	  converted_idx = &conversion_blocksize;
++	  goto numeric_common;
++        case_GETOPT_HELP_CHAR;
++        case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
++        default:
++          usage (EXIT_FAILURE);
++	}
++    }
++
++  sanitize_operands (&blocksize, &count, &skip, &seek, &count_B, &skip_B, &seek_B);
++  return seen_getopt;
++}
++
++static void
++scanargs_jcl (int argc, char *const *argv)
+ {
+   idx_t blocksize = 0;
+   intmax_t count = INTMAX_MAX;
+@@ -1583,7 +1796,21 @@
+             *converted_idx = n;
+         }
+     }
++    sanitize_operands (&blocksize, &count, &skip, &seek, &count_B, &skip_B, &seek_B);
++}
+ 
++static void
++sanitize_operands (idx_t * p_blocksize, intmax_t * p_count,
++		  intmax_t * p_skip, intmax_t * p_seek,
++		  bool * p_count_B, bool * p_skip_B, bool * p_seek_B)
++{
++#define	blocksize (*p_blocksize)
++#define	count (*p_count)
++#define	skip (*p_skip)
++#define	seek (*p_seek)
++#define	count_B (*p_count_B)
++#define	skip_B (*p_skip_B)
++#define	seek_B (*p_seek_B)
+   if (blocksize)
+     input_blocksize = output_blocksize = blocksize;
+   else
+@@ -1678,6 +1905,13 @@
+       o_nocache_eof = (max_records == 0 && max_bytes == 0);
+       output_flags &= ~O_NOCACHE;
+     }
++#undef	blocksize
++#undef	count
++#undef	skip
++#undef	seek
++#undef	count_B
++#undef	skip_B
++#undef	seek_B
+ }
+ 
+ /* Fix up translation table. */
+@@ -2419,17 +2653,21 @@
+ 
+   page_size = getpagesize ();
+ 
+-  parse_gnu_standard_options_only (argc, argv, PROGRAM_NAME, PACKAGE, Version,
+-                                   true, usage, AUTHORS,
+-                                   (char const *) NULL);
++  int seen_getopt = scanargs_getopt(argc, argv);
+   close_stdout_required = false;
+ 
+   /* Initialize translation table to identity translation. */
+   for (int i = 0; i < 256; i++)
+     trans_table[i] = i;
+ 
+-  /* Decode arguments. */
+-  scanargs (argc, argv);
++  /* Decode old JCL-style arguments. */
++  if (seen_getopt) {
++    if (optind < argc) {
++      diagnose (0, _("unrecognized operand %s"), quoteaf (argv[optind]));
++      usage (EXIT_FAILURE);
++    }
++  } else
++    scanargs_jcl (argc, argv);
+ 
+   apply_translations ();
+ 
