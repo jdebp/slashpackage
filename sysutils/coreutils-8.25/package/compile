@@ -1,0 +1,63 @@
+#!/bin/sh -e
+# See http://jdebp.uk./FGA/slashpackage.html
+if test \! -d package
+then
+	echo "You are not in the right directory." 1>&2
+	exit 100
+fi
+
+. ../../package_scripts.subr	# Use common slashpackage shell function library.
+
+name='coreutils'
+version='8.25'
+source_archive() {
+	extension='.tar.xz'
+	url='ftp://ftp.gnu.org/pub/gnu/'"${name}"'/'"${name}"'-'"${version}${extension}"
+	SHA256='31e67c057a5b32a582f26408c789e11c2e8d676593324849dcf5779296cdce87'
+	SIZE='5725008'
+}
+buildtools="iconv"
+
+fetch_source
+
+export CDPATH=
+
+uses_gnu_make
+check_buildtools
+clone_source_to_build
+
+# Rebuild.
+if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
+then
+	calculate_make_cpus
+fi
+target="${PWD}"
+(
+	cd build
+	# The GNU coreutils release archive comes pre-configured.
+	# Running Autotools on it again breaks it.
+	# https://lists.gnu.org/r/bug-datamash/2025-04/msg00005.html
+	test -r config.status || sh ./configure --prefix="${target}" --build="$(slashpackage_target)" --enable-single-binary=symlinks --program-transform-name='s/ginstall/install/'
+	"${make}" ${cpus:+ -j "${cpus}"}
+	test -e src/install || ln -f -- src/ginstall src/install
+	test -e 'man/[.1' || ln -f -- man/test.1 'man/[.1'
+)
+
+# Atomically update the release directories ./command, ./library, ./include, and so forth.
+# The build and release directories need not be on the same disc volume.
+# And the files released must not be potentially overwritable and truncatable by the compiler/linker during subsequent builds.
+# But released files can be links to other released files, of course.
+install -d -m 0755 command manual
+
+# ##############################################################################
+# Build all of the ...{new} files in ./command, ./config, ./manual, and ./library.
+install_commands_0 src
+install_manuals_0 man ''
+collapse_utf8_man_0
+
+# ##############################################################################
+# Rename the ...{new} files in ./command, ./config, ./manual, and ./library.
+install_commands_1
+install_manuals_1 '' ''
+collapse_utf8_man_1

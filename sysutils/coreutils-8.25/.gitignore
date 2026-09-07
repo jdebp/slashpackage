@@ -1,0 +1,9 @@
+build
+command
+config
+library
+manual
+source
+dist
+zsh-*.tar.gz
+zsh-*.tar.bz2
