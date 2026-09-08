@@ -9,9 +9,7 @@ fi
 . ../../package_scripts.subr	# Use common slashpackage shell function library.
 
 name='xmlto'
-git_name="${name}"
 version='0.0.29'
-gittag="${version}"
 source_archive() {
 	extension='.tar.gz'
 	url='http://releases.pagure.org/'"${name}"'/'"${name}"'-'"${version}${extension}"
@@ -89,12 +87,15 @@ do
 done
 collapse_utf8_man_0
 # format and make files
-install -d -m 0755 config/format{new}
-(
-	cd build/format
-	pax -r -w -p a * ../../config/format{new}
-)
-find config/format{new}/ -name '*.orig' -delete
+for directory in format
+do
+	install -d -m 0755 config/"${directory}"{new}
+	(
+		cd build/"${directory}"
+		pax -r -w -p a * ../../config/"${directory}"{new}
+	)
+	find config/"${directory}"{new}/ -name '*.orig' -delete
+done
 for file in xmlto.mak
 do
 	rm -f -- config/"${file}"{new}
@@ -133,9 +134,7 @@ collapse_utf8_man_1
 # format and make files
 for directory in format
 do
-	test -e config/"${directory}" && mv -f -- config/"${directory}" config/"${directory}"{old}
-	mv -f -- config/"${directory}"{new} config/"${directory}"
-	rm -f -r -- config/"${directory}"{old}
+	rename_directory config/"${directory}"{new} config/"${directory}"
 done
 for file in xmlto.mak
 do

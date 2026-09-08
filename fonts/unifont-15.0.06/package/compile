@@ -10,14 +10,13 @@ fi
 
 name='unifont'
 version='15.0.06'
-gittag="${version}"
 source_archive() {
 	extension='.tar.gz'
 	url='http://ftpmirror.gnu.org'/"${name}"/"${name}-${version}"/"${name}-${version}${extension}"
 	SHA256='36668eb1326d22e1466b94b3929beeafd10b9838bf3d41f4e5e3b52406ae69f1'
 	SIZE='40878710'
 }
-buildtools=
+buildtools=vtfontcvt
 
 fetch_or_checkout_source
 
@@ -51,101 +50,20 @@ install -d -m 0755 command manual config config/fonts
 
 # ##############################################################################
 # Build all of the ...{new} files in ./command and ./manual.
-for section in 1 2 3 4 5 6 7 8 9
-do
-	# All of the commands that have executables
-	test -r package/commands${section} && cat package/commands${section} |
-	while read -r i
-	do
-		rm -f -- command/"$i"{new}
-		if objdump -f build/bin/"$i" >/dev/null 2>&1
-		then
-			install -m 0755 -p -- build/bin/"$i" command/"$i"{new}
-			strip -p -- command/"$i"{new}
-			chmod 0555 command/"$i"{new}
-		else
-			install -m 0555 -p -- build/bin/"$i" command/"$i"{new}
-		fi
-	done
-	# All of the aliases for other commands
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		rm -f -- command/"${alias}"{new}
-		ln -f -- command/"${command}"{new} command/"${alias}"{new}
-	done
-	# All of the commands that have their own manual pages
-	(
-		test -r package/commands${section} && cat package/commands${section}
-		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
-	) |
-	while read -r i
-	do
-		install -d -m 0755 -- manual/man${section}
-		rm -f -- manual/man${section}/"$i".${section}{new}
-		install -m 0444 -p -- build/man/"$i".${section} manual/man${section}/"$i".${section}{new}
-	done
-	# All of the manual pages for aliases
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
-		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
-		ln -f -s -- "${command}".${section} manual/man${section}/"${alias}".${section}{new}
-	done
-done
+install_commands_0 bin
+install_manuals_0 man ''
 collapse_utf8_man_0
 
 # ##############################################################################
 # Rename the ...{new} files in ./command and ./manual.
-for section in 1 2 3 4 5 6 7 8 9
-do
-	# All of the commands that have executables and all of their aliases
-	(
-		test -r package/commands${section} && cat package/commands${section}
-		test -r package/aliases${section} && awk '{print $2;}' package/aliases${section}
-	) |
-	while read -r i
-	do
-		mv -f -- command/"$i"{new} command/"$i"
-	done
-	# All of the commands that have their own manual pages
-	(
-		test -r package/commands${section} && cat package/commands${section}
-		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
-	) |
-	while read -r i
-	do
-		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
-	done
-	# All of the manual pages for aliases
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
-		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
-		mv -f -- manual/man${section}/"${alias}".${section}{new} manual/man${section}/"${alias}".${section}
-	done
-done
+install_commands_1
+install_manuals_1 ''
 collapse_utf8_man_1
 
 # ##############################################################################
 # Build all of the ...{new} files in ./config.
-(
-	test -r package/fonts && cat package/fonts
-) |
-while read -r font
-do
-	rm -f -- config/fonts/"${font}".fnt{new}
-	install -m 0444 -p -- build/font/precompiled/"${font}".fnt config/fonts/"${font}".fnt{new}
-done
+install_fonts_0 font/precompiled .fnt
 
 # ##############################################################################
 # Rename the ...{new} directories and files in ./config.
-(
-	test -r package/fonts && cat package/fonts
-) |
-while read -r font
-do
-	mv -f -- config/fonts/"${font}".fnt{new} config/fonts/"${font}".fnt
-done
+install_fonts_1 .fnt

@@ -22,19 +22,19 @@ apply_local_changes() {
 	fi
 }
 
-if test -d /usr/src/bin/pax
+# Create and checkout the source directory.
+if test \! -d source
 then
-	# Create and checkout the source directory.
-	if test \! -d source
+	install -d -m 0755 source
+	source="${PWD}"/source
+	if test -d /usr/src/bin/pax
 	then
-		install -d -m 0755 source
-		source="${PWD}"/source
 		( cd /usr/src/bin/pax && (2>/dev/null pax -w -r -l -u -- * "${source}" || true ) )
 		apply_local_modifications
+	else
+		echo "/usr/src/bin/pax does not exist." 1>&2
+		exit 100
 	fi
-else
-	echo "/usr/src/bin/pax does not exist." 1>&2
-	exit 100
 fi
 
 export CDPATH=
@@ -62,70 +62,12 @@ install -d -m 0755 command manual
 
 # ##############################################################################
 # Build all of the ...{new} files in ./command and ./manual.
-for section in 1 2 3 4 5 6 7 8 9
-do
-	# All of the commands that have executables
-	test -r package/commands${section} && cat package/commands${section} |
-	while read -r i
-	do
-		rm -f -- command/"$i"{new}
-		if objdump -f build/"$i" >/dev/null 2>&1
-		then
-			install -m 0755 -p -- build/"$i" command/"$i"{new}
-			strip -p -- command/"$i"{new}
-			chmod 0555 command/"$i"{new}
-		else
-			install -m 0555 -p -- build/"$i" command/"$i"{new}
-		fi
-	done
-	# All of the commands that have their own manual pages
-	test -r package/commands${section} && cat package/commands${section} |
-	while read -r i
-	do
-		install -d -m 0755 -- manual/man${section}
-		rm -f -- manual/man${section}/"$i".${section}{new}
-		install -m 0444 -p -- build/"$i".${section} manual/man${section}/"$i".${section}{new}
-	done
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		ln -f -- command/"${command}"{new} command/"${alias}"{new}
-	done
-	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
-	while read -r i
-	do
-		install -d -m 0755 -- manual/man${section}
-		rm -f -- manual/man${section}/"$i".${section}{new}
-		install -m 0444 -p -- build/"$i".${section} manual/man${section}/"$i".${section}{new}
-	done
-done
+install_commands_0 .
+install_manuals_0 . ''
 collapse_utf8_man_0
 
 # ##############################################################################
 # Rename the ...{new} files in ./command and ./manual.
-for section in 1 2 3 4 5 6 7 8 9
-do
-	# All of the commands that have executables
-	test -r package/commands${section} && cat package/commands${section} |
-	while read -r i
-	do
-		mv -f -- command/"$i"{new} command/"$i"
-	done
-	# All of the commands that have their own manual pages
-	test -r package/commands${section} && cat package/commands${section} |
-	while read -r i
-	do
-		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
-	done
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		mv -f -- command/"${alias}"{new} command/"${alias}"
-	done
-	test -r package/extra-manpages${section} && cat package/extra-manpages${section} |
-	while read -r i
-	do
-		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
-	done
-done
+install_commands_1
+install_manuals_1 ''
 collapse_utf8_man_1

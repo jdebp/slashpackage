@@ -1,14 +1,41 @@
 #!/bin/sh -e
 # Handy subroutine library for package/compile scripts.
 # vim: ft=sh:
-make_symbolic_link() {
-	rm -f -- "$2"
-	ln -f -s -- "$1" "$2"
+
+# ##############################################################################
+# Low-level file and directory manipulation.
+case "`uname`" in
+Linux)
+	rename_symbolic_link() {
+		! test -e "$2" || mv -f -- "$2" "$2"{old}
+		mv -f -- "$1" "$2"
+		rm -f -- "$2"{old}
+	}
+	make_symbolic_link() {
+		ln -f -n -s -- "$1" "$2"
+	}
+	;;
+*)
+	rename_symbolic_link() {
+		mv -f -h -- "$1" "$2"
+	}
+	make_symbolic_link() {
+		ln -f -h -s -- "$1" "$2"
+	}
+	;;
+esac
+rename_directory() {
+	! test -e "$2" || mv -f -- "$2" "$2"{old}
+	mv -f -- "$1" "$2"
+	rm -f -r -- "$2"{old}
 }
+
+# ##############################################################################
+# Initialization for packages that use GNU Autotools.
 uses_gnu_autotools_sans_autoreconf() {
 	buildtools="${buildtools} autoconf autoheader automake aclocal"
 	auto_reconfigure() {
-		test -r aclocal.m4 || aclocal
+		test -r aclocal.m4 || aclocal ${aclocal_options}
 		test -r config.h.in || autoheader
 		test -r configure || autoconf
 		test -r install-sh || automake --add-missing ${automake_options}
@@ -19,11 +46,15 @@ uses_gnu_autotools() {
 	if autoreconf="$(command -v autoreconf)"
 	then
 		auto_reconfigure() {
-			"${autoreconf}" --install --symlink --verbose
+			"${autoreconf}" --install --symlink --verbose ${autoreconf_options}
 		}
 	fi
 }
-make='make'
+
+# ##############################################################################
+# Initialization for packages that are tied to specific make tools.
+# Calculating some rough and ready profiles for parallel make.
+make='make'	# This always expands to something.
 uses_bsd_make() {
 	case "`uname`" in
 	Linux) make='bmake' ;;
@@ -48,6 +79,10 @@ calculate_make_cpus() {
 		cpus=4
 	fi
 }
+
+# ##############################################################################
+# Applying local modifications to distributed/checked-in source trees.
+# These apply patches from a subdirectory.
 apply_local_patches() {
 	local patchfile
 	# Apply our patches.
@@ -61,99 +96,114 @@ apply_local_patches() {
 	fi
 }
 apply_local_changes() {
-	:
+	:	# Override this to make bespoke modifications.
 }
 apply_local_modifications() {
 	apply_local_patches
 	apply_local_changes
 }
+
+# ##############################################################################
+# Fetching source from a remote site or checking it out from a local repository.
+# Packages can do one, or the other, or sometimes both.
 cleanup_source_from_git() {
-	:
+	:	# Override this to do bespoke cleanup.
 }
 cleanup_dist_from_archive() {
-	:
+	:	# Override this to do bespoke cleanup.
 }
-fetch_or_checkout_source() {
-	if test -d ../"${name}.git"
+checkout_source() {
+	# Create and checkout the source directory.
+	if test \! -d source
 	then
-		# Create and checkout the source directory.
-		if test \! -d source
-		then
-			install -d -m 0755 source
-			rm -f -- source/.git
-			ln -f -s -- ../../"${name}.git" source/.git
-			( cd source && git checkout -f "${gittag}" )
-			apply_local_modifications
-			cleanup_source_from_git
-		fi
-	else
-		# Download the source.
-		if ! test -d dist/"${name}-${version}"/
-		then
-			install -d -m 0755 dist
-			case "`uname`" in
-			Linux) ftp=tnftp ;;
-			*BSD) ftp=ftp ;;
-			esac
-			source_archive
-			archive="${name}-${version}${extension}"
-			(
-				cd dist
-				"${ftp}" -o "${archive}" "${url}"
-				case "`uname`" in
-				FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
-				esac
-				case "${extension}" in
-				*.xz)
-					case "`uname`" in
-					Linux)	< "${archive}" pax -r -J ;;
-					NetBSD)	< "${archive}" pax -r --xz ;;
-					*)	< "${archive}" xz -dc | pax -r ;;
-					esac
-				;;
-				*.bz2)
-					case "`uname`" in
-					Linux)	< "${archive}" pax -r -j ;;
-					NetBSD)	< "${archive}" pax -r -j ;;
-					*)	< "${archive}" bzip2 -dc | pax -r ;;
-					esac
-				;;
-				*.gz)
-					case "`uname`" in
-					Linux)		< "${archive}" pax -r -z ;;
-					NetBSD|FreeBSD)	< "${archive}" pax -r -z ;;
-					*)		< "${archive}" gzip -dc | pax -r ;;
-					esac
-				;;
-				*)
-					< "${archive}" pax -r
-				;;
-				esac
-			)
-			if ! test -d dist/"${name}-${version}"/
-			then
-				if test -d dist/"${name}"/
-				then
-					make_symbolic_link "${name}" dist/"${name}-${version}"
-				elif test -n "${dirname}" && test -d dist/"${dirname}"/
-				then
-					make_symbolic_link "${dirname}" dist/"${name}-${version}"
-				fi
-			fi
-			cleanup_dist_from_archive
-			# Force re-creation of the source directory.
-			rm -r -f -- source
-		fi
-
-		# Create and populate the source directory.
-		if test \! -d source
-		then
-			install -d -m 0755 source
-			( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
-			apply_local_modifications
-		fi
+		install -d -m 0755 source
+		rm -f -- source/.git
+		ln -f -s -- ../../"${git_name:-${name}}.git" source/.git
+		( cd source && git checkout -f "${gittag:-${version}}" )
+		apply_local_modifications
+		cleanup_source_from_git
 	fi
 }
+fetch_source() {
+	# Download the source.
+	if ! test -d dist/"${name}-${version}"/
+	then
+		install -d -m 0755 dist
+		case "`uname`" in
+		Linux) ftp=tnftp ;;
+		*BSD) ftp=ftp ;;
+		esac
+		source_archive
+		archive="${name}-${version}${extension}"
+		(
+			cd dist
+			"${ftp}" -o "${archive}" "${url}"
+			case "`uname`" in
+			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			esac
+			case "${extension}" in
+			*.xz)
+				case "`uname`" in
+				Linux)	< "${archive}" pax -r -J ;;
+				NetBSD)	< "${archive}" pax -r --xz ;;
+				*)	< "${archive}" xz -dc | pax -r ;;
+				esac
+			;;
+			*.bz2)
+				case "`uname`" in
+				Linux)	< "${archive}" pax -r -j ;;
+				NetBSD)	< "${archive}" pax -r -j ;;
+				*)	< "${archive}" bzip2 -dc | pax -r ;;
+				esac
+			;;
+			*.gz)
+				case "`uname`" in
+				Linux)		< "${archive}" pax -r -z ;;
+				NetBSD|FreeBSD)	< "${archive}" pax -r -z ;;
+				*)		< "${archive}" gzip -dc | pax -r ;;
+				esac
+			;;
+			*)
+				< "${archive}" pax -r
+			;;
+			esac
+		)
+		if ! test -d dist/"${name}-${version}"/
+		then
+			if test -d dist/"${name}"/
+			then
+				make_symbolic_link "${name}" dist/"${name}-${version}"
+			elif test -n "${dirname}" && test -d dist/"${dirname}"/
+			then
+				make_symbolic_link "${dirname}" dist/"${name}-${version}"
+			fi
+		fi
+		cleanup_dist_from_archive
+		# Force re-creation of the source directory.
+		rm -r -f -- source
+	fi
+
+	# Create and populate the source directory.
+	if test \! -d source
+	then
+		install -d -m 0755 source
+		( cd dist/"${name}-${version}" && ( 2>/dev/null pax -w -r -l -u -- * ../../source/ || true ) )
+		apply_local_modifications
+	fi
+}
+fetch_or_checkout_source() {
+	if test -d ../"${git_name:-${name}}.git"
+	then
+		checkout_source
+	else
+		fetch_source
+	fi
+}
+
+# ##############################################################################
+# Ensuring that vital build tools are present.
+# This does not cover redo or cubehash.
+# It also does not cover pax, which is supposed to be present as standard per the SUS.
 check_buildtools() {
 	local tool
 	# Check build command dependencies.
@@ -166,25 +216,138 @@ check_buildtools() {
 		fi
 	done
 }
+
+# ##############################################################################
+# Initializing the ./build subdirectory.
 clone_source_to_build() {
 	# Create and populate the build directory.
 	install -d -m 0755 build
 	( cd source && (2>/dev/null pax -w -r -l -u -- * ../build/ || true ) )
 }
-case "`uname`" in
-Linux)
-	rename_symbolic_link() {
-		test -e "$2" && mv -f -- "$2" "$2"{old}
-		mv -f -- "$1" "$2"
-		rm -f -- "$2"{old}
-	}
-	;;
-*)
-	rename_symbolic_link() {
-		mv -f -h -- "$1" "$2"
-	}
-	;;
-esac
+
+# ##############################################################################
+# Installing commands to ./command and manual pages to ./manual, setup phase.
+install_commands_0() {
+	local section binsubdir="${1:-.}"
+
+	for section in 1 2 3 4 5 6 7 8 9
+	do
+		# All of the commands that have executables
+		! test -r package/commands${section} || cat package/commands${section} |
+		while read -r i
+		do
+			rm -f -- command/"$i"{new}
+			if objdump -f build/"${binsubdir}"/"$i" >/dev/null 2>&1
+			then
+				install -m 0755 -p -- build/"${binsubdir}"/"$i" command/"$i"{new}
+				strip -p -- command/"$i"{new}
+				chmod 0555 command/"$i"{new}
+			else
+				install -m 0555 -p -- build/"${binsubdir}"/"$i" command/"$i"{new}
+			fi
+		done
+		# All of the aliases for other commands
+		! test -r package/aliases${section} || cat package/aliases${section} |
+		while read -r command alias
+		do
+			rm -f -- command/"${alias}"{new}
+			ln -f -- command/"${command}"{new} command/"${alias}"{new}
+		done
+	done
+}
+install_manuals_0() {
+	local section mansubdir="${1:-.}" language="${2:-.}"
+
+	for section in 1 2 3 4 5 6 7 8 9
+	do
+		# All of the commands that have their own manual pages
+		(
+			! test -r package/commands${section} || cat package/commands${section}
+			! test -r package/extra-manpages${section} || cat package/extra-manpages${section}
+		) |
+		while read -r i
+		do
+			install -d -m 0755 -- manual/man${section} manual/"${language}" manual/"${language}"/man${section}
+			rm -f -- manual/"${language}"/man${section}/"$i".${section}{new}
+			install -m 0444 -p -- build/"${mansubdir}"/"${language}"/"$i".${section} manual/"${language}"/man${section}/"$i".${section}{new}
+		done
+		# All of the manual pages for aliases
+		! test -r package/aliases${section} || cat package/aliases${section} |
+		while read -r command alias
+		do
+			! test -r package/commands${section} || ! grep -q -- "^${alias}\$" package/commands${section} || continue
+			! test -r package/extra-manpages${section} || ! grep -q -- "^${alias}\$" package/extra-manpages${section} || continue
+			ln -f -s -- "${command}".${section} manual/"${language}"/man${section}/"${alias}".${section}{new}
+		done
+	done
+}
+install_manual_section_0() {
+	local section="${1}" mansubdir="${2:-.}" language="${3:-.}"
+
+	# All of the commands that have their own manual pages
+	(
+		! test -r package/commands${section} || cat package/commands${section}
+		! test -r package/extra-manpages${section} || cat package/extra-manpages${section}
+	) |
+	while read -r i
+	do
+		install -d -m 0755 -- manual/man${section} manual/"${language}" manual/"${language}"/man${section}
+		rm -f -- manual/"${language}"/man${section}/"$i".${section}{new}
+		install -m 0444 -p -- build/"${mansubdir}"/"${language}"/"$i".${section} manual/"${language}"/man${section}/"$i".${section}{new}
+	done
+	# All of the manual pages for aliases
+	! test -r package/aliases${section} || cat package/aliases${section} |
+	while read -r command alias
+	do
+		! test -r package/commands${section} || ! grep -q -- "^${alias}\$" package/commands${section} || continue
+		! test -r package/extra-manpages${section} || ! grep -q -- "^${alias}\$" package/extra-manpages${section} || continue
+		ln -f -s -- "${command}".${section} manual/"${language}"/man${section}/"${alias}".${section}{new}
+	done
+}
+
+# ##############################################################################
+# Installing commands to ./command and manual pages to ./manual, finalization phase.
+install_commands_1() {
+	local section
+	for section in 1 2 3 4 5 6 7 8 9
+	do
+		# All of the commands that have executables and all of their aliases
+		(
+			! test -r package/commands${section} || cat package/commands${section}
+			! test -r package/aliases${section} || awk '{print $2;}' package/aliases${section}
+		) |
+		while read -r i
+		do
+			mv -f -- command/"$i"{new} command/"$i"
+		done
+	done
+}
+install_manuals_1() {
+	local section language="${1:-.}"
+	for section in 1 2 3 4 5 6 7 8 9
+	do
+		# All of the commands that have their own manual pages
+		(
+			! test -r package/commands${section} || cat package/commands${section}
+			! test -r package/extra-manpages${section} || cat package/extra-manpages${section}
+		) |
+		while read -r i
+		do
+			mv -f -- manual/"${language}"/man${section}/"$i".${section}{new} manual/"${language}"/man${section}/"$i".${section}
+		done
+		# All of the manual pages for aliases
+		! test -r package/aliases${section} || cat package/aliases${section} |
+		while read -r command alias
+		do
+			! test -r package/commands${section} || ! grep -q -- "^${alias}\$" package/commands${section} || continue
+			! test -r package/extra-manpages${section} || ! grep -q -- "^${alias}\$" package/extra-manpages${section} || continue
+			mv -f -- manual/"${language}"/man${section}/"${alias}".${section}{new} manual/"${language}"/man${section}/"${alias}".${section}
+		done
+	done
+}
+
+# ##############################################################################
+# Handy symbolic links for modern systems with UTF-8 locales dealing with mono-locale manual pages.
 collapse_utf8_man_0() {
 	# Symbolic links in place of subdirectories to fool the man(1) command
 	for directory in en_GB.UTF-8 en.UTF-8
@@ -203,6 +366,43 @@ collapse_utf8_man_1() {
 		rename_symbolic_link manual/"${directory}"{new} manual/"${directory}"
 	done
 }
+
+# ##############################################################################
+# Installing fonts to ./config/fonts .
+install_fonts_0() {
+	local font fonttype fontsubdir="${1:-.}"
+	shift
+
+	(
+		test -r package/fonts && cat package/fonts
+	) |
+	while read -r font
+	do
+		for fonttype
+		do
+			rm -f -- config/fonts/"${font}${fonttype}"{new}
+			install -m 0444 -p -- build/"${fontsubdir}"/"${font}${fonttype}" config/fonts/"${font}${fonttype}"{new}
+		done
+	done
+}
+install_fonts_1() {
+	local font fonttype
+	(
+		test -r package/fonts && cat package/fonts
+	) |
+	while read -r font
+	do
+		for fonttype
+		do
+			mv -f -- config/fonts/"${font}${fonttype}"{new} config/fonts/"${font}${fonttype}"
+		done
+	done
+}
+
+# ##############################################################################
+# Calculating the 'target tuple'.
+# FreeBSD ports has a 'manufacturer' of 'portbld'.
+# Likewise, we have a 'manufacturer' of 'slashpackage'.
 slashpackage_target() {
 	local isa opsys release
 	case "`uname`" in

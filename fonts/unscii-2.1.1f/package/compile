@@ -51,21 +51,8 @@ install -d -m 0755 config/fonts
 
 # ##############################################################################
 # Build all of the ...{new} files in ./config.
-(
-	test -r package/fonts && cat package/fonts
-) |
-while read -r font
-do
-	rm -f -- config/fonts/"${font}"{new}
-	install -m 0444 -p -- build/fontfiles/"${font}" config/fonts/"${font}"{new}
-done
+install_fonts_0 fontfiles ''
 
 # ##############################################################################
 # Rename the ...{new} directories and files in ./config.
-(
-	test -r package/fonts && cat package/fonts
-) |
-while read -r font
-do
-	mv -f -- config/fonts/"${font}"{new} config/fonts/"${font}"
-done
+install_fonts_1 ''

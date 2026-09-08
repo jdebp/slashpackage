@@ -10,7 +10,6 @@ fi
 
 name='zhcon'
 version='0.2.3'
-gittag="${version}"
 source_archive() {
 	extension='.tar.gz'
 	url='http://downloads.sourceforge.net/project/'"${name}/${name}/${version}/${name}-${version}${extension}"
@@ -45,82 +44,14 @@ install -d -m 0755 command manual config config/locale config/share config/share
 
 # ##############################################################################
 # Build all of the ...{new} files in ./command and ./manual.
-for section in 1 2 3 4 5 6 7 8 9
-do
-	# All of the commands that have executables
-	test -r package/commands${section} && cat package/commands${section} |
-	while read -r i
-	do
-		rm -f -- command/"$i"{new}
-		if objdump -f build/src/"$i" >/dev/null 2>&1
-		then
-			install -m 0755 -p -- build/src/"$i" command/"$i"{new}
-			strip -p -- command/"$i"{new}
-			chmod 0555 command/"$i"{new}
-		else
-			install -m 0555 -p -- build/src/"$i" command/"$i"{new}
-		fi
-	done
-	# All of the aliases for other commands
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		rm -f -- command/"${alias}"{new}
-		ln -f -- command/"${command}"{new} command/"${alias}"{new}
-	done
-	# All of the commands that have their own manual pages
-	(
-		test -r package/commands${section} && cat package/commands${section}
-		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
-	) |
-	while read -r i
-	do
-		install -d -m 0755 -- manual/man${section}
-		rm -f -- manual/man${section}/"$i".${section}{new}
-		install -m 0444 -p -- build/doc/"$i".${section} manual/man${section}/"$i".${section}{new}
-	done
-	# All of the manual pages for aliases
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
-		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
-		ln -f -s -- "${command}".${section} manual/man${section}/"${alias}".${section}{new}
-	done
-done
+install_commands_0 src
+install_manuals_0 doc ''
 collapse_utf8_man_0
 
 # ##############################################################################
 # Rename the ...{new} files in ./command and ./manual.
-for section in 1 2 3 4 5 6 7 8 9
-do
-	# All of the commands that have executables and all of their aliases
-	(
-		test -r package/commands${section} && cat package/commands${section}
-		test -r package/aliases${section} && awk '{print $2;}' package/aliases${section}
-	) |
-	while read -r i
-	do
-		mv -f -- command/"$i"{new} command/"$i"
-	done
-	# All of the commands that have their own manual pages
-	(
-		test -r package/commands${section} && cat package/commands${section}
-		test -r package/extra-manpages${section} && cat package/extra-manpages${section}
-	) |
-	while read -r i
-	do
-		mv -f -- manual/man${section}/"$i".${section}{new} manual/man${section}/"$i".${section}
-	done
-	# All of the manual pages for aliases
-	test -r package/aliases${section} && cat package/aliases${section} |
-	while read -r command alias
-	do
-		test -r package/commands${section} && grep -q -- "^${alias}\$" package/commands${section} && continue
-		test -r package/extra-manpages${section} && grep -q -- "^${alias}\$" package/extra-manpages${section} && continue
-		mv -f -- manual/man${section}/"${alias}".${section}{new} manual/man${section}/"${alias}".${section}
-	done
-done
+install_commands_1
+install_manuals_1 ''
 collapse_utf8_man_1
 
 # ##############################################################################

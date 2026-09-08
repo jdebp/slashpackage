@@ -44,10 +44,12 @@ install -d -m 0755 command manual
 
 # ##############################################################################
 # Build all of the ...{new} files in ./command and ./manual.
-install_commands_and_manuals_0 src man
+install_commands_0 src
+install_manuals_0 man ''
 collapse_utf8_man_0
 
 # ##############################################################################
 # Rename the ...{new} files in ./command and ./manual.
-install_commands_and_manuals_1
+install_commands_1
+install_manuals_1 '' ''
 collapse_utf8_man_1
