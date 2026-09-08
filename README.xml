@@ -22,7 +22,7 @@
 		The <filename>/package</filename> hierarchy is an implementation of <ulink url="https://jdebp.uk/FGA/slashpackage.html">Daniel J. Bernstein's "slashpackage" concept</ulink>.
 	</para>
 
-	<refsection>
+	<refsection id="STRUCTURE" reflabel="STRUCTURE">
 		<title>Structure</title>
 
 		<para>
@@ -37,6 +37,12 @@
 				</listitem>
 			</varlistentry>
 			<varlistentry>
+				<term><filename>archivers</filename></term>
+				<listitem>
+					<para>file archiving tools</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
 				<term><filename>editors</filename></term>
 				<listitem>
 					<para>text and document editors</para>
@@ -46,6 +52,12 @@
 				<term><filename>fonts</filename></term>
 				<listitem>
 					<para>fonts and tools for manipulating font files</para>
+				</listitem>
+			</varlistentry>
+			<varlistentry>
+				<term><filename>ftp</filename></term>
+				<listitem>
+					<para>file transfer programs</para>
 				</listitem>
 			</varlistentry>
 			<varlistentry>
@@ -66,6 +78,12 @@
 					<para>system-level utilities such as terminal emulators</para>
 				</listitem>
 			</varlistentry>
+			<varlistentry>
+				<term><filename>textutils</filename></term>
+				<listitem>
+					<para>utilities for text processing</para>
+				</listitem>
+			</varlistentry>
 		</variablelist>
 
 		<para>
@@ -73,7 +91,7 @@
 		</para>
 	</refsection>
 
-	<refsection>
+	<refsection id="NATIVE" reflabel="NATIVE">
 		<title>Native packages</title>
 
 		<para>
@@ -105,7 +123,7 @@
 		</itemizedlist>
 	</refsection>
 
-	<refsection>
+	<refsection id="NONNATIVE" reflabel="NONNATIVE">
 		<title>Non-native packages</title>
 
 		<para>
@@ -138,6 +156,21 @@
 			The parallel source control repository for a non-native package is incorporated as <ulink url="https://git-scm.com/book/en/v2/Git-Tools-Submodules">a git submodule</ulink>.
 		</para>
 	</refsection>
+</refsection>
+
+<refsection id="FILES" xreflabel="FILES">
+	<title>Files</title>
+
+	<variablelist>
+		<varlistentry>
+			<term><filename>package_scripts.subr</filename></term>
+			<listitem>
+				<para>
+					A collection of <command>sh</command> functions for use in non-native packaging scripts for perfoming common tasks.
+				</para>
+			</listitem>
+		</varlistentry>
+	</variablelist>
 </refsection>
 
 <refsection id="HISTORY" xreflabel="HISTORY">
