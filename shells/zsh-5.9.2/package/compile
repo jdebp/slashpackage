@@ -41,17 +41,17 @@ then
 fi
 target="${PWD}"
 case "`uname`" in
-Linux)
+(Linux)
 	pkgbase='/usr'
 	shrbase="${pkgbase}"/share/"${name}"
 	etcdir="${pkgbase}"/../etc/"${name}"
 	;;
-FreeBSD)
+(FreeBSD)
 	pkgbase='/usr/local'
 	shrbase="${pkgbase}"/share/"${name}"
 	etcdir="${pkgbase}"/etc/"${name}"
 	;;
-*)
+(*)
 	pkgbase='/usr/pkg'
 	shrbase="${pkgbase}"/share/"${name}"
 	etcdir="${pkgbase}"/etc/"${name}"
@@ -197,12 +197,12 @@ done
 for dest in site-functions site-scripts startup
 do
 	case "`uname`" in
-	Linux)
+	(Linux)
 		test -e config/"${dest}" && mv -f -- config/"${dest}" config/"${dest}"{old}
 		mv -f -- config/"${dest}"{new} config/"${dest}"
 		rm -f -- config/"${dest}"{old}
 		;;
-	*)
+	(*)
 		mv -f -h -- config/"${dest}"{new} config/"${dest}"
 		;;
 	esac

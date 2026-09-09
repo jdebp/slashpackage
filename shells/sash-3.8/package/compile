@@ -21,8 +21,8 @@ buildtools=
 
 apply_local_changes() {
 	case "`uname`" in
-	Linux)	;;
-	*)	printf '%s\n' '%s/\(HAVE_LINUX_[[:alnum:]_]*[[:space:]]*\)= 1/\1= 0/' '%s/\(MOUNT_TYPE[[:space:]]*\)= '"'"'"ext3"'"'"'/\1= '"'"'"ufs"'"'"'/' 'wq' | ex source/Makefile ;;
+	(Linux)	;;
+	(*)	printf '%s\n' '%s/\(HAVE_LINUX_[[:alnum:]_]*[[:space:]]*\)= 1/\1= 0/' '%s/\(MOUNT_TYPE[[:space:]]*\)= '"'"'"ext3"'"'"'/\1= '"'"'"ufs"'"'"'/' 'wq' | ex source/Makefile ;;
 	esac
 }
 
