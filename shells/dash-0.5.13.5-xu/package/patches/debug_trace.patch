@@ -1,0 +1,40 @@
+diff --git src/main.c src/main.c
+index 2ab506c..25e3dc7 100644
+--- src/main.c
++++ src/main.c
+@@ -219,7 +219,9 @@ cmdloop(int top)
+ 			chkmail();
+ 		}
+ 		n = parsecmd(inter);
+-		/* showtree(n); DEBUG */
++#if DEBUG > 2
++		showtree(n);
++#endif
+ 		if (n == NEOF) {
+ 			if (!top || numeof >= 50)
+ 				break;
+diff --git src/options.c src/options.c
+index c4eedeb..a748e47 100644
+--- src/options.c
++++ src/options.c
+@@ -148,7 +148,7 @@ procargs(char **xargv)
+ 	for (i = 0; i < NOPTS; i++)
+ 		if (optlist[i] == 2)
+ 			optlist[i] = 0;
+-#if DEBUG == 2
++#if DEBUG > 1
+ 	debug = 1;
+ #endif
+ 	/* POSIX 1003.2: first arg after -c cmd is $0, remainder $1... */
+diff --git src/show.c src/show.c
+index 4a049e9..65db497 100644
+--- src/show.c
++++ src/show.c
+@@ -34,6 +34,7 @@
+ 
+ #include <stdio.h>
+ #include <stdarg.h>
++#include <stdlib.h>	/* for abort() */
+ 
+ #include "shell.h"
+ #include "parser.h"

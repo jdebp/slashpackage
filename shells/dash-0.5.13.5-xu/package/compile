@@ -38,6 +38,7 @@ fi
 (
 	cd build
 	auto_reconfigure
+	export CPPFLAGS='-U DEBUG'
 	test -r config.status || sh ./configure --with-libedit --enable-glob --enable-fnmatch
 	"${make}" ${cpus:+ -j "${cpus}"}
 	for i in dash
