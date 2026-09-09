@@ -1,0 +1,149 @@
+diff --git src/dash.1 src/dash.1
+index e1031a5..4ccab55 100644
+--- src/dash.1
++++ src/dash.1
+@@ -268,7 +268,7 @@ operators (their meaning is discussed later).
+ Following is a list of operators:
+ .Bl -ohang -offset indent
+ .It "Control operators:"
+-.Dl &  &&  \&(  \&)  \&;  ;; | || <newline>
++.Dl &  &&  \&(  \&)  \&;  ;; ;& | || <newline>
+ .It "Redirection operators:"
+ .Dl <  >  >|  <<  >>  <&  >&  <<-  <>
+ .El
+@@ -667,8 +667,9 @@ These are implemented as builtin commands.
+ The syntax of the case command is
+ .Bd -literal -offset indent
+ case word in
+-[(]pattern) list ;;
++[(]pattern) list terminator
+ \&...
++[(]pattern) list [terminator]
+ esac
+ .Ed
+ .Pp
+@@ -682,6 +683,27 @@ The
+ (
+ .Dc
+ character before the pattern is optional.
++The final terminator is also optional.
++.Pp
++The terminator can be
++.Dq ;;
++or
++.Dq ;& .
++Terminating a list with
++.Dq ;;
++means that when the list has been executed, the whole case statement is
++complete and no further patterns are expanded and matched or lists are
++executed.
++Terminating a list with
++.Dq ;&
++means that when the list has been executed, execution continues with the
++following list unconditionally, without matching any of its patterns.
++This will continue down until esac is reached or a list terminated with
++.Dq ;;
++has been executed.
++.Pp
++The exit status of the case command is the exit status of the last list
++that is executed, or zero if none have been.
+ .Ss Grouping Commands Together
+ Commands may be grouped by writing either
+ .Pp
+diff --git src/eval.c src/eval.c
+index 0f2a7ba..1775ca0 100644
+--- src/eval.c
++++ src/eval.c
+@@ -466,9 +466,18 @@ evalcase(union node *n, int flags)
+ 				 * EV_EXIT may prevent us from setting the
+ 				 * exit status.
+ 				 */
+-				if (evalskip == 0 && cp->nclist.body) {
+-					status = evaltree(cp->nclist.body,
+-							  flags);
++				for (;;) {
++					if (evalskip == 0 && cp->nclist.body) {
++						status = evaltree(cp->nclist.body,
++								  flags & ~EV_EXIT);
++					}
++					if (!cp->nclist.fall || 0 != evalskip)
++						break;
++					cp = cp->nclist.next;
++					if (!cp)
++					{
++						break;
++					}
+ 				}
+ 				goto out;
+ 			}
+diff --git src/jobs.c src/jobs.c
+index 914b383..49a8ded 100644
+--- src/jobs.c
++++ src/jobs.c
+@@ -1385,7 +1385,7 @@ dotail2:
+ 			cmdtxt(np->nclist.pattern);
+ 			cmdputs(") ");
+ 			cmdtxt(np->nclist.body);
+-			cmdputs(";; ");
++			cmdputs(np->nclist.fall ? ";& " : ";; ");
+ 		}
+ 		p = "esac";
+ 		goto dotail2;
+diff --git src/main.c src/main.c
+index 2ab506c..25e3dc7 100644
+diff --git src/mktokens src/mktokens
+index dcef676..41c6511 100644
+--- src/mktokens
++++ src/mktokens
+@@ -70,6 +70,7 @@ TUNTIL	0	"until"
+ TWHILE	0	"while"
+ TBEGIN	0	"{"
+ TEND	1	"}"
++TENDCASEFALL 1	";&"
+ !
+ nl=`wc -l "${TMPDIR}"/ka$$`
+ exec > token.h
+diff --git src/nodetypes src/nodetypes
+index ceaf478..330a7cc 100644
+--- src/nodetypes
++++ src/nodetypes
+@@ -105,6 +105,7 @@ NCLIST nclist			# a case
+ 	next	  nodeptr		# the next case in list
+ 	pattern	  nodeptr		# list of patterns for this case
+ 	body	  nodeptr		# code to execute for this case
++	fall	  int			# whether to fall through
+ 
+ 
+ NDEFUN ndefun			# a function
+diff --git src/parser.c src/parser.c
+index e44b3c3..360501e 100644
+--- src/parser.c
++++ src/parser.c
+@@ -463,10 +463,12 @@ next_case:
+ 
+ 			checkkwd = CHKNL | CHKKWD;
+ 			if ((t = readtoken()) != TESAC) {
+-				if (t != TENDCASE)
++				if (t != TENDCASE && t != TENDCASEFALL)
+ 					synexpect(TENDCASE);
+-				else
++				else {
++					cp->nclist.fall = TENDCASEFALL == t;
+ 					goto next_case;
++				}
+ 			}
+ 		}
+ 		*cpp = NULL;
+@@ -834,8 +836,11 @@ xxreadtoken(void)
+ 			pungetc();
+ 			RETURN(TPIPE);
+ 		case ';':
+-			if (pgetc_eatbnl() == ';')
++			c = pgetc_eatbnl();
++			if (c == ';')
+ 				RETURN(TENDCASE);
++			else if (c == '&')
++				RETURN(TENDCASEFALL);
+ 			pungetc();
+ 			RETURN(TSEMI);
+ 		case '(':
