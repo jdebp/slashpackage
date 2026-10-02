@@ -75,55 +75,55 @@
  
 +      oputs (_("\
 +  --bs BYTES\n\
-+same as the bs operand\n\
++     same as the bs operand\n\
 +"));
 +      oputs (_("\
 +  --cbs BYTES\n\
-+same as the cbs operand\n\
++     same as the cbs operand\n\
 +"));
 +      oputs (_("\
 +  --conv CONVS\n\
-+same as the conv operand\n\
++     same as the conv operand\n\
 +"));
 +      oputs (_("\
 +  -n, --count N\n\
-+same as the count operand\n\
++     same as the count operand\n\
 +"));
 +      oputs (_("\
 +  -r, --ibs BYTES\n\
-+same as the ibs operand\n\
++     same as the ibs operand\n\
 +"));
 +      oputs (_("\
 +  -i, --if FILE\n\
-+same as the if operand\n\
++     same as the if operand\n\
 +"));
 +      oputs (_("\
 +  --iflag FLAGS\n\
-+same as the iflag operand\n\
++     same as the iflag operand\n\
 +"));
 +      oputs (_("\
 +  -w, --obs BYTES\n\
-+same as the obs operand\n\
++     same as the obs operand\n\
 +"));
 +      oputs (_("\
 +  -o, --of FILE\n\
-+same as the of operand\n\
++     same as the of operand\n\
 +"));
 +      oputs (_("\
 +  --oflag FLAGS\n\
-+same as the oflag operand\n\
++     same as the oflag operand\n\
 +"));
 +      oputs (_("\
 +  -I, --seek FF\n\
-+same as the seek operand\n\
++     same as the seek operand\n\
 +"));
 +      oputs (_("\
 +  -O, --skip FF\n\
-+same as the skip operand\n\
++     same as the skip operand\n\
 +"));
 +      oputs (_("\
 +  --status LEVEL\n\
-+same as the status operand\n\
++     same as the status operand\n\
 +"));
        oputs (HELP_OPTION_DESCRIPTION);
        oputs (VERSION_OPTION_DESCRIPTION);
