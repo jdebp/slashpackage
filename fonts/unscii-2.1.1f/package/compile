@@ -18,7 +18,9 @@ source_archive() {
 	SHA256='x'
 	SIZE='x'
 }
-buildtools="vtfontcvt"
+# In pkgsrc, bdftopcf is in fonts/bdftopcf and perl needs the p5-Text-CharWidth package.
+# In Debian, bdftopcf is in xfonts-utils.
+buildtools="bdftopcf"
 
 apply_local_changes() {
 	install -d -m 0755 source/fontfiles
@@ -30,17 +32,21 @@ export CDPATH=
 
 clone_source_to_build
 
+uses_bsd_make
+
 check_buildtools
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
+   ! > /dev/null expr "${MAKEFLAGS}" : "-j" &&
    ! > /dev/null expr "${REDOFLAGS}" : "--jobs"
 then
 	calculate_make_cpus
 fi
 (
 	cd build
-	make ${cpus:+ -j "${cpus}"} fnt bdf
+	"${make}" ${cpus:+ -j "${cpus}"} vtfontcvt vectorize
+	"${make}" ${cpus:+ -j "${cpus}"} hex fnt bdf svg pcf
 )
 
 # Atomically update the release directories ./command, ./library, ./include, and so forth.
