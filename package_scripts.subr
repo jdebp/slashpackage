@@ -5,7 +5,7 @@
 # ##############################################################################
 # Low-level file and directory manipulation.
 case "`uname`" in
-Linux)
+(Linux)
 	rename_symbolic_link() {
 		! test -e "$2" || mv -f -- "$2" "$2"{old}
 		mv -f -- "$1" "$2"
@@ -15,7 +15,7 @@ Linux)
 		ln -f -n -s -- "$1" "$2"
 	}
 	;;
-*)
+(*)
 	rename_symbolic_link() {
 		mv -f -h -- "$1" "$2"
 	}
@@ -41,6 +41,15 @@ uses_gnu_autotools_sans_autoreconf() {
 		test -r install-sh || automake --add-missing ${automake_options}
 	}
 }
+uses_gnu_autotools_no_install() {
+	uses_gnu_autotools_sans_autoreconf
+	if autoreconf="$(command -v autoreconf)"
+	then
+		auto_reconfigure() {
+			"${autoreconf}" --symlink --verbose ${autoreconf_options}
+		}
+	fi
+}
 uses_gnu_autotools() {
 	uses_gnu_autotools_sans_autoreconf
 	if autoreconf="$(command -v autoreconf)"
@@ -57,22 +66,22 @@ uses_gnu_autotools() {
 make='make'	# This always expands to something.
 uses_bsd_make() {
 	case "`uname`" in
-	Linux) make='bmake' ;;
-	*) make='make' ;;
+	(Linux) make='bmake' ;;
+	(*) make='make' ;;
 	esac
 	buildtools="${buildtools} ${make}"
 }
 uses_gnu_make() {
 	case "`uname`" in
-	Linux) make='make' ;;
-	*) make='gmake' ;;
+	(Linux) make='make' ;;
+	(*) make='gmake' ;;
 	esac
 	buildtools="${buildtools} ${make}"
 }
 calculate_make_cpus() {
 	case "`uname`" in
-	Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
-	*BSD) cpus="`sysctl -n hw.ncpu`" ;;
+	(Linux) cpus="`grep -F -c processor /proc/cpuinfo`" ;;
+	(*BSD) cpus="`sysctl -n hw.ncpu`" ;;
 	esac
 	if > /dev/null expr "${cpus}" '>' 4
 	then
@@ -139,31 +148,31 @@ fetch_source() {
 			cd dist
 			"${ftp}" -o "${archive}" "${url}"
 			case "`uname`" in
-			FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
+			(FreeBSD)	sha256 -c "${SHA256}" "${archive}" ;;
 			esac
 			case "${extension}" in
-			*.xz)
+			(*.xz)
 				case "`uname`" in
-				Linux)	< "${archive}" pax -r -J ;;
-				NetBSD)	< "${archive}" pax -r --xz ;;
-				*)	< "${archive}" xz -dc | pax -r ;;
+				(Linux)	< "${archive}" pax -r -J ;;
+				(NetBSD)	< "${archive}" pax -r --xz ;;
+				(*)	< "${archive}" xz -dc | pax -r ;;
 				esac
 			;;
-			*.bz2)
+			(*.bz2)
 				case "`uname`" in
-				Linux)	< "${archive}" pax -r -j ;;
-				NetBSD)	< "${archive}" pax -r -j ;;
-				*)	< "${archive}" bzip2 -dc | pax -r ;;
+				(Linux)	< "${archive}" pax -r -j ;;
+				(NetBSD)	< "${archive}" pax -r -j ;;
+				(*)	< "${archive}" bzip2 -dc | pax -r ;;
 				esac
 			;;
-			*.gz)
+			(*.gz)
 				case "`uname`" in
-				Linux)		< "${archive}" pax -r -z ;;
-				NetBSD|FreeBSD)	< "${archive}" pax -r -z ;;
-				*)		< "${archive}" gzip -dc | pax -r ;;
+				(Linux)		< "${archive}" pax -r -z ;;
+				(NetBSD|FreeBSD)	< "${archive}" pax -r -z ;;
+				(*)		< "${archive}" gzip -dc | pax -r ;;
 				esac
 			;;
-			*)
+			(*)
 				< "${archive}" pax -r
 			;;
 			esac
@@ -406,10 +415,10 @@ install_fonts_1() {
 slashpackage_target() {
 	local isa opsys release
 	case "`uname`" in
-	Linux)
+	(Linux)
 		isa="$(uname -m|sed -e 's/amd64/x86_64/')"
 		;;
-	*)
+	(*)
 		isa="$(uname -p|sed -e 's/amd64/x86_64/')"
 		;;
 	esac
