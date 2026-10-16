@@ -1,5 +1,5 @@
 --- ../dist/util-linux-2.42.4/login-utils/login.1	2026-09-21 11:35:20.000000000 +0100
-+++ login-utils/login.1	2026-10-16 17:45:06.151058169 +0100
++++ login-utils/login.1	2026-10-16 23:41:44.250262298 +0100
 @@ -1,13 +1,13 @@
  '\" t
  .\"     Title: login
@@ -27,7 +27,7 @@
  Then the user\(cqs shell is started. If no shell is specified for the user with \fB\-s\fP or in \fI/etc/passwd\fP, then \fI/bin/sh\fP is used. If the specified shell contains a space, it is treated as a shell script. If there is no home directory specified in \fI/etc/passwd\fP, then \fI/\fP is used, followed by \fI.hushlogin\fP check as described below.
  .sp
 -If the file \fI.hushlogin\fP exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if \fI/var/log/lastlog\fP exists, the last login time is printed, and the current login is recorded.
-+If the \fIhushlogin_P capability exists in \fBlogin.conf\fP(5) or the If the file _.hushlogin\fP exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if \fI/var/log/lastlog\fP exists, the last login time is printed, and the current login is recorded.
++If the \fIhushlogin\fP capability exists in \fBlogin.conf\fP(5) or if the file \fI.hushlogin\fP exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if \fI/var/log/lastlog\fP exists, the last login time is printed, and the current login is recorded.
  .SH "OPTIONS"
  .sp
  \fB\-p\fP
@@ -43,7 +43,7 @@
  .sp
  \fBMOTD_FILE\fP (string)
 --- ../dist/util-linux-2.42.4/login-utils/login.1.adoc	2026-08-04 11:59:56.000000000 +0100
-+++ login-utils/login.1.adoc	2026-10-16 17:06:20.443144670 +0100
++++ login-utils/login.1.adoc	2026-10-16 23:41:39.382262479 +0100
 @@ -34,11 +34,12 @@
  
  Other environment variables are preserved if the *-p* option is given or if *LOGIN_ENV_SAFELIST* defined in _/etc/login.defs_ (see below).
@@ -54,7 +54,7 @@
  Then the user's shell is started. If no shell is specified for the user with *-s* or in _/etc/passwd_, then _/bin/sh_ is used. If the specified shell contains a space, it is treated as a shell script. If there is no home directory specified in _/etc/passwd_, then _/_ is used, followed by _.hushlogin_ check as described below.
  
 -If the file _.hushlogin_ exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if _/var/log/lastlog_ exists, the last login time is printed, and the current login is recorded.
-+If the _hushlogin_P capability exists in *login.conf*(5) or the If the file _.hushlogin_ exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if _/var/log/lastlog_ exists, the last login time is printed, and the current login is recorded.
++If the _hushlogin_ capability exists in *login.conf*(5) or if the file _.hushlogin_ exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if _/var/log/lastlog_ exists, the last login time is printed, and the current login is recorded.
  
  == OPTIONS
  
