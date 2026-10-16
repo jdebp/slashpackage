@@ -1,0 +1,1520 @@
+--- ../dist/util-linux-2.42.4/login-utils/login.1	2026-09-21 11:35:20.000000000 +0100
++++ login-utils/login.1	2026-10-16 17:45:06.151058169 +0100
+@@ -1,13 +1,13 @@
+ '\" t
+ .\"     Title: login
+ .\"    Author: [see the "AUTHOR(S)" section]
+-.\" Generator: Asciidoctor 2.0.26
+-.\"      Date: 2026-08-04
++.\" Generator: Asciidoctor 2.0.23
++.\"      Date: 2026-10-16
+ .\"    Manual: User Commands
+ .\"    Source: util-linux 2.42.4
+ .\"  Language: English
+ .\"
+-.TH "LOGIN" "1" "2026-08-04" "util\-linux 2.42.4" "User Commands"
++.TH "LOGIN" "1" "2026-10-16" "util\-linux 2.42.4" "User Commands"
+ .ie \n(.g .ds Aq \(aq
+ .el       .ds Aq '
+ .ss \n[.ss] 0
+@@ -46,11 +46,12 @@
+ .sp
+ Other environment variables are preserved if the \fB\-p\fP option is given or if \fBLOGIN_ENV_SAFELIST\fP defined in \fI/etc/login.defs\fP (see below).
+ .sp
++The system \fI/etc/login.conf\fP and the user\(cqs \fI~/.login_conf\fP files are processed for further environment variables and settings.
+ The environment variables defined by PAM are always preserved.
+ .sp
+ Then the user\(cqs shell is started. If no shell is specified for the user with \fB\-s\fP or in \fI/etc/passwd\fP, then \fI/bin/sh\fP is used. If the specified shell contains a space, it is treated as a shell script. If there is no home directory specified in \fI/etc/passwd\fP, then \fI/\fP is used, followed by \fI.hushlogin\fP check as described below.
+ .sp
+-If the file \fI.hushlogin\fP exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if \fI/var/log/lastlog\fP exists, the last login time is printed, and the current login is recorded.
++If the \fIhushlogin_P capability exists in \fBlogin.conf\fP(5) or the If the file _.hushlogin\fP exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if \fI/var/log/lastlog\fP exists, the last login time is printed, and the current login is recorded.
+ .SH "OPTIONS"
+ .sp
+ \fB\-p\fP
+@@ -91,6 +92,10 @@
+ .RE
+ .SH "CONFIG FILE ITEMS"
+ .sp
++\fBlogin\fP reads the system \fI/etc/login.conf\fP and the user\(cqs \fI~/.login_conf_files (see \fBlogin.conf\fP(5)).
++The login classes searched for in the former are _root\fP for root and \fIdefault\fP for normal users.
++The login class searched for in the latter is always \fIme\fP.
++.sp
+ \fBlogin\fP reads the \fI/etc/login.defs\fP configuration file (see \fBlogin.defs\fP(5)). Note that the configuration file could be distributed with another package (usually shadow\-utils). The following configuration items are relevant for \fBlogin\fP:
+ .sp
+ \fBMOTD_FILE\fP (string)
+--- ../dist/util-linux-2.42.4/login-utils/login.1.adoc	2026-08-04 11:59:56.000000000 +0100
++++ login-utils/login.1.adoc	2026-10-16 17:06:20.443144670 +0100
+@@ -34,11 +34,12 @@
+ 
+ Other environment variables are preserved if the *-p* option is given or if *LOGIN_ENV_SAFELIST* defined in _/etc/login.defs_ (see below).
+ 
++The system _/etc/login.conf_ and the user's _~/.login_conf_ files are processed for further environment variables and settings.
+ The environment variables defined by PAM are always preserved.
+ 
+ Then the user's shell is started. If no shell is specified for the user with *-s* or in _/etc/passwd_, then _/bin/sh_ is used. If the specified shell contains a space, it is treated as a shell script. If there is no home directory specified in _/etc/passwd_, then _/_ is used, followed by _.hushlogin_ check as described below.
+ 
+-If the file _.hushlogin_ exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if _/var/log/lastlog_ exists, the last login time is printed, and the current login is recorded.
++If the _hushlogin_P capability exists in *login.conf*(5) or the If the file _.hushlogin_ exists, then a "quiet" login is performed. This disables the checking of mail and the printing of the last login time and message of the day. Otherwise, if _/var/log/lastlog_ exists, the last login time is printed, and the current login is recorded.
+ 
+ == OPTIONS
+ 
+@@ -63,6 +64,10 @@
+ 
+ == CONFIG FILE ITEMS
+ 
++*login* reads the system _/etc/login.conf_ and the user's _~/.login_conf_files (see *login.conf*(5)).
++The login classes searched for in the former are _root_ for root and _default_ for normal users.
++The login class searched for in the latter is always _me_.
++
+ *login* reads the _/etc/login.defs_ configuration file (see *login.defs*(5)). Note that the configuration file could be distributed with another package (usually shadow-utils). The following configuration items are relevant for *login*:
+ 
+ *MOTD_FILE* (string)::
+--- ../dist/util-linux-2.42.4/login-utils/login.c	2026-08-04 11:59:56.000000000 +0100
++++ login-utils/login.c	2026-10-16 19:44:46.450791108 +0100
+@@ -85,6 +85,7 @@
+ #include "pwdutils.h"
+ 
+ #include "logindefs.h"
++#include "login_conf.h"
+ 
+ #if defined (HAVE_LIBECONF) && defined (USE_VENDORDIR)
+ # include "shells.h"
+@@ -126,6 +127,9 @@
+ 	pam_handle_t	*pamh;		/* PAM handler */
+ 	struct pam_conv	conv;		/* PAM conversation */
+ 
++	struct login_cap_t *lc_system;	/* system /etc/login.conf */
++	struct login_cap_t *lc_user;	/* user ~/login_conf */
++
+ #ifdef LOGIN_CHOWN_VCS
+ 	char		vcsn[VCS_PATH_MAX];	/* virtual console name */
+ 	char		vcsan[VCS_PATH_MAX];
+@@ -139,8 +143,8 @@
+ 
+ 	pid_t		pid;
+ 
+-	bool		quiet,		/* hush file exists */
+-			remote,		/* login -h */
++	int		quiet;		/* hush file exists */
++	bool		remote,		/* login -h */
+ 			nohost,		/* login -H */
+ 			noauth,		/* login -f */
+ 			keep_env;	/* login -p */
+@@ -1258,7 +1262,7 @@
+ 	char tmp[PATH_MAX];
+ 	int len, i;
+ 
+-	saved = env_list_add_getenv(NULL, "TERM", "dumb");
++	saved = env_list_add_getenv(NULL, "TERM", NULL);	/* login.conf handles defaulting this if it is unset. */
+ 	saved = env_list_add_getenv(saved, "COLORTERM", NULL);
+ 	saved = env_list_add_getenv(saved, "NO_COLOR", NULL);
+ 
+@@ -1275,10 +1279,6 @@
+ 
+ 	env_list_free(saved);
+ 
+-	xsetenv("HOME", pwd->pw_dir, 0);	/* legal to override */
+-	xsetenv("USER", pwd->pw_name, 1);
+-	xsetenv("SHELL", pwd->pw_shell, 1);
+-
+ 	if (logindefs_setenv_path(pwd->pw_uid) != 0)
+ 		err(EXIT_FAILURE, _("failed to set the PATH environment variable"));
+ 
+@@ -1287,9 +1287,14 @@
+ 	if (len > 0 && (size_t)len < sizeof(tmp))
+ 		xsetenv("MAIL", tmp, 0);
+ 
+-	/* LOGNAME is not documented in login(1) but HP-UX 6.5 does it. We'll
+-	 * not allow modifying it.
+-	 */
++	loginconf_set_environ(pwd, cxt->lc_system, cxt->lc_user);
++
++	/* These may have been declared safe and inherited from a parent, or set in login.conf(5). */
++	xsetenv("HOME", pwd->pw_dir, 0);
++
++	/* These always overwrite what may be inherited, or set in login.defs(5) or login.conf(5) */
++	xsetenv("USER", pwd->pw_name, 1);
++	/* LOGNAME is not documented in login(1) but HP-UX 6.5 does it. */
+ 	xsetenv("LOGNAME", pwd->pw_name, 1);
+ 
+ 	env = pam_getenvlist(cxt->pamh);
+@@ -1567,6 +1572,7 @@
+ #endif
+ 	};
+ 	bool script;
++	int r;
+ 
+ 	setlocale(LC_ALL, "");
+ 	bindtextdomain(PACKAGE, LOCALEDIR);
+@@ -1629,7 +1635,12 @@
+ 		}
+ 	}
+ 
+-	cxt.quiet = get_hushlogin_status(pwd, pam_getenv(cxt.pamh, "HOME"), 1) == 1 ? 1 : 0;
++	/*
++	 * This expects to be run with superuser credentials.
++	 * Ideally, it wouldn't do the credential-switching rigmarole at all,
++	 * and we'd call this after dropping privileges.
++	 */
++	cxt.quiet = get_hushlogin_status(pwd, pam_getenv(cxt.pamh, "HOME"), 1);
+ 
+ 	/*
+ 	 * Open PAM session (after successful authentication and account check).
+@@ -1655,21 +1666,10 @@
+ 		exit(EXIT_FAILURE);
+ 	}
+ 
+-	if (cxt.shell_arg && *cxt.shell_arg != '\0') {
+-		pwd->pw_shell = cxt.shell_arg;
+-	} else if (pwd->pw_shell == NULL || *pwd->pw_shell == '\0') {
+-		pwd->pw_shell = _PATH_BSHELL;
+-	}
+-
+-	init_environ(&cxt);		/* init $HOME, $TERM ... */
+-
+ 	process_title_update(cxt.username);
+ 
+ 	log_syslog(&cxt);
+ 
+-	if (!cxt.quiet)
+-		display_login_messages();
+-
+ 	/*
+ 	 * Detach the controlling terminal, fork, and create a new session
+ 	 * and reinitialize syslog stuff.
+@@ -1682,6 +1682,35 @@
+ 		exit(EXIT_FAILURE);
+ 	}
+ 
++	/* At this point we are using the credentials of the logged-in account.
++	 * We access all files -- ~/.hushlogin, ~/.login_conf, /etc/login.conf, /etc/motd, /etc/login.defs &c. -- using those credentials.
++	 * We do not need superuser access or even write access to any of these files, in the first place.
++	 * The principle of least privilege applies.
++	 */
++
++	cxt.lc_system = loginconf_getsystem(pwd);
++	cxt.lc_user = loginconf_getuser(pwd);
++
++	if (cxt.shell_arg && *cxt.shell_arg != '\0') {
++		pwd->pw_shell = cxt.shell_arg;
++	} else if (pwd->pw_shell == NULL || *pwd->pw_shell == '\0') {
++		pwd->pw_shell = _PATH_BSHELL;
++	}
++
++	init_environ(&cxt);		/* init $HOME, $TERM ... */
++
++	r = loginconf_get_hushlogin(cxt.lc_system, cxt.lc_user);
++	if (0 <= r)
++		cxt.quiet = r;
++
++	loginconf_close(cxt.lc_user);
++	cxt.lc_user = NULL;
++	loginconf_close(cxt.lc_system);
++	cxt.lc_system = NULL;
++
++	if (1 > cxt.quiet)
++		display_login_messages();
++
+ 	/* wait until here to change directory! */
+ 	const char *home = getenv("HOME") ?: pwd->pw_dir;
+ 	if (chdir(home) < 0) {
+--- ../dist/util-linux-2.42.4/login-utils/Makemodule.am	2026-08-04 11:59:56.000000000 +0100
++++ login-utils/Makemodule.am	2026-10-16 17:08:34.867139671 +0100
+@@ -55,9 +55,13 @@
+ 
+ if BUILD_LOGIN
+ bin_PROGRAMS += login
+-MANPAGES += login-utils/login.1
+-dist_noinst_DATA += login-utils/login.1.adoc
++MANPAGES += login-utils/login.1 \
++	login-utils/login.conf.5
++dist_noinst_DATA += login-utils/login.1.adoc \
++	login-utils/login.conf.5.adoc
+ login_SOURCES = \
++	login-utils/login_cap.c \
++	login-utils/login_conf.c \
+ 	login-utils/login.c
+ login_LDADD = $(LDADD) libcommon.la libcommon_logindefs.la libcommon_shells.la -lpam
+ if HAVE_LINUXPAM
+--- /dev/null	2026-09-21 08:10:21.047999989 +0100
++++ login-utils/login_cap.c	2026-10-16 19:37:54.482806431 +0100
+@@ -0,0 +1,360 @@
++/*
++ *  login_cap.c -- workalike for the BSD login_cap(3) library
++ *
++ *  Copyright 2026 Jonathan de Boyne Pollard
++ *  This file is based on prior work by Jonathan de Boyne Pollard.
++ *
++ *  This file is free software; you can redistribute it and/or
++ *  modify it under the terms of the GNU Library General Public
++ *  License version 2 as published by the Free Software Foundation.
++ */
++/*
++ * This operates off the source text files.
++ * The original library operates off Berkeley DB files.
++ *
++ * We could operate off GDBM files likewise; but that would involve adding a cap_mkdb(1) clone.
++ */
++
++#include <errno.h>
++#include <pwd.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdbool.h>
++#include <string.h>
++#include <unistd.h>
++#include <ctype.h>
++
++#include "c.h"
++#include "closestream.h"
++#include "login_cap.h"
++
++#if !defined(LOGIN_DEFROOTCLASS)
++#define LOGIN_DEFROOTCLASS "root"
++#endif
++#if !defined(LOGIN_DEFCLASS)
++#define LOGIN_DEFCLASS "default"
++#endif
++#if !defined(LOGIN_MECLASS)
++#define LOGIN_MECLASS "me"
++#endif
++
++struct login_cap_t {
++	char * * list;
++	size_t size;
++	char * res;
++};
++
++static inline
++int
++append_char_to_string(
++	char ** ps,
++	char c
++) {
++	if (!ps)
++		return -EINVAL;
++	size_t l = strlen(*ps);
++	char * tmp = realloc(*ps, l + 2U);
++	if (!tmp)
++		return -ENOMEM;
++	*ps = tmp;
++	tmp[l++] = c;
++	tmp[l++] = '\0';
++	return 0;
++}
++
++static
++void
++clear(
++	struct login_cap_t * d
++) {
++	for (size_t n = 0; n < d->size; ++n) {
++		free(d->list[n]);
++		d->list[n] = NULL;
++	}
++	d->size = 0;
++	free(d->list); d->list = NULL;
++	free(d->res); d->res = NULL;
++}
++
++inline
++void
++split_capabilities(
++	struct login_cap_t * d,
++	const char * line
++) {
++	bool inside = false;
++	for (char c = *line++; c; c = *line++) {
++		if (':' == c) {
++			inside = false;
++		} else
++		if (inside || !isspace((unsigned char)c))
++		{
++			if (!inside) {
++				++d->size;
++				char ** n = (char **)realloc(d->list, sizeof(*d->list) * d->size);
++				if (!n)
++					return;
++				d->list = n;
++				d->list[d->size - 1] = strdup("");
++				inside = true;
++			}
++			append_char_to_string(&d->list[d->size - 1], c);
++		}
++	}
++}
++
++static inline
++bool
++matches(
++	struct login_cap_t * d,
++	const char * const name
++) {
++	bool r = false;
++	if (!d && d->size <= 0U) return r;
++	bool inside = false;
++	char * field = strdup("");
++	char * names = d->list[0U];
++	for (char c = *names++; ; c = *names++) {
++		if (!c || '|' == c) {
++			inside = false;
++			if (0 == strcmp(name, field)) {
++				r = true;
++				break;
++			}
++			if (!c)
++				break;
++		} else
++		if (inside || !isspace((unsigned char)c))
++		{
++			if (!inside) {
++				*field = '\0';
++				inside = true;
++			}
++			append_char_to_string(&field, c);
++		}
++	}
++	free(field);
++	return r;
++}
++
++static
++bool
++lookup_byfile(
++	struct login_cap_t * d,
++	FILE * file,
++	const char * name
++) {
++	bool r = false;
++	if (!file || !name) return r;
++	clear(d);
++	enum { BOL, COMMENT, COMMENT_ESCAPE, LEAD_SPACE, LINE, LINE_ESCAPE } state = BOL;
++	char * line = strdup("");
++	for (;;) {
++		const int c = getc(file);
++		if (EOF == c) return false;
++		switch (state) {
++			append:
++				append_char_to_string(&line, c);
++				break;
++			newline:
++				*line = '\0';
++				state = BOL;
++				break;
++			case BOL:
++				if ('\n' == c) 
++					goto newline;
++				else
++				if (isspace((unsigned char)c))
++					state = LEAD_SPACE;
++				else
++				if ('#' == c)
++					state = COMMENT;
++				else {
++					state = LINE;
++					goto append;
++				}
++				break;
++			case LEAD_SPACE:
++				if ('\n' == c) 
++					goto newline;
++				else
++				if (isspace((unsigned char)c))
++					break;
++				else
++				if ('#' == c)
++					state = COMMENT;
++				else {
++					state = LINE;
++					goto append;
++				}
++				break;
++			case COMMENT:
++				if ('\n' == c) 
++					goto newline;
++				else
++				if ('\\' == c)
++					state = COMMENT_ESCAPE;
++				break;
++			case COMMENT_ESCAPE:
++				state = COMMENT;
++				break;
++			case LINE:
++				if ('\n' == c) {
++					split_capabilities(d, line);
++					if (matches(d, name)) {
++						r = true;
++						goto out;
++					}
++					clear(d);
++					goto newline;
++				} else
++				if ('\\' == c)
++					state = LINE_ESCAPE;
++				else
++					goto append;
++				break;
++			case LINE_ESCAPE:
++				state = LINE;
++				if ('\n' != c) {
++					append_char_to_string(&line, '\\');
++					goto append;
++				}
++				break;
++		}
++	}
++out:
++	free(line);
++	return r;
++}
++
++static
++bool
++lookup_byname(
++	struct login_cap_t * d,
++	const char * filename,
++	const char * c
++) {
++	bool r = false;
++	if (!filename)
++		return r;
++	FILE * f = fopen(filename, "r");
++	if (!f)
++		return r;
++	r = lookup_byfile(d, f, c);
++	fclose(f);
++	return r;
++}
++
++struct login_cap_t *
++login_getsystemclass(
++	const struct passwd * pwd
++) {
++	const char * c = pwd && 0 == pwd->pw_uid ? LOGIN_DEFROOTCLASS : LOGIN_DEFCLASS;
++	struct login_cap_t * r = (struct login_cap_t *)calloc(1U, sizeof(struct login_cap_t));
++	if (r) {
++		if (!lookup_byname(r, "/etc/login.conf", c)) {
++			const int error = errno;
++			login_close(r);
++			errno = error;
++			return NULL;
++		}
++	}
++	return r;
++}
++
++struct login_cap_t *
++login_getuserclass(
++	const struct passwd * pwd
++) {
++	if (!pwd || !pwd->pw_dir || !*pwd->pw_dir) return NULL;
++	struct login_cap_t * r = (struct login_cap_t *)calloc(1U, sizeof(struct login_cap_t));
++	if (r) {
++		size_t l = strlen(pwd->pw_dir);
++		char * filename = malloc(l + sizeof "/.login_conf");
++		if (filename)
++			strcat(strcpy(filename, pwd->pw_dir), "/.login_conf");
++		if (!filename || !lookup_byname(r, filename, LOGIN_MECLASS)) {
++			const int error = errno;
++			login_close(r);
++			errno = error;
++			return NULL;
++		}
++	}
++	return r;
++}
++
++const char *
++login_getcapstr(
++	struct login_cap_t * d,
++	const char *cap,
++	const char *def,
++	const char *err
++) {
++	if (!d || !cap)
++		return err;
++	size_t caplen = strlen(cap);
++	for (size_t n = 1; n < d->size; ++n) {
++		if (0 != strncmp(d->list[n], cap, caplen))
++			continue;
++		char sep = d->list[n][caplen];
++		if ('@' == sep && !d->list[n][caplen + 1])
++			return def;
++		if ('=' == sep) {
++			const char * val = d->list[n] + caplen + 1;
++			free(d->res);
++			d->res = strdup(val);
++			size_t len = strlen(d->res);
++			for (char * q = d->res; *q; ++q) {
++				if ('\\' == *q && q[1]) {
++					switch (q[1]) {
++						case '0': 		q[1] = '\0'; break;
++						case 'b': case 'B':	q[1] = '\b'; break;
++						case 'r': case 'R':	q[1] = '\r'; break;
++						case 'c': case 'C':	q[1] = ':'; break;
++						case 'e': case 'E':	q[1] = '\x1b'; break;
++						case 't': case 'T':	q[1] = '\t'; break;
++						case 'n': case 'N':	q[1] = '\n'; break;
++						case 'f': case 'F':	q[1] = '\f'; break;
++						default:		break;  // Also handles backslash escaping itself.
++					}
++					memmove(q, q + 1, len - (q - d->res));	// includes the terminating NUL
++				} else
++				if ('^' == *q && q[1]) {
++					q[1] ^= 0x40;
++					memmove(q, q + 1, len - (q - d->res));	// includes the terminating NUL
++				}
++			}
++			return d->res;
++		}
++	}
++	return def;
++}
++
++int
++login_getcapbool(
++	const struct login_cap_t * d,
++	const char * cap,
++	int def
++) {
++	if (!d || !cap)
++		return def;
++	size_t len = strlen(cap);
++	for (size_t n = 0; n < d->size; ++n) {
++		if (0 != strncmp(d->list[n], cap, len))
++			continue;
++		char sep = d->list[n][len];
++		if (!sep)
++			return true;
++		if ('@' == sep && !d->list[n][len + 1])
++			return false;
++	}
++	return def;
++}
++
++void
++login_close(
++	struct login_cap_t * d
++) {
++	if (d) clear(d);
++	free(d);
++}
+--- /dev/null	2026-09-21 08:10:21.047999989 +0100
++++ login-utils/login_cap.h	2026-10-16 16:43:27.431195738 +0100
+@@ -0,0 +1,23 @@
++/*
++ *  login_cap.h -- workalike for the BSD login_cap(3) library
++ *
++ *  Copyright 2026 Jonathan de Boyne Pollard
++ *  This file is based on prior work by Jonathan de Boyne Pollard.
++ *
++ *  This file is free software; you can redistribute it and/or
++ *  modify it under the terms of the GNU Library General Public
++ *  License version 2 as published by the Free Software Foundation.
++ */
++#ifndef UTIL_LINUX_LOGIN_CAP_H
++#define UTIL_LINUX_LOGIN_CAP_H
++
++struct login_cap_t;	/* opaque */
++struct passwd;	/* forward */
++
++struct login_cap_t * login_getsystemclass(const struct passwd * pwd);
++struct login_cap_t * login_getuserclass(const struct passwd * pwd);
++const char * login_getcapstr(struct login_cap_t * d, const char *cap, const char *def, const char *err);
++int login_getcapbool(const struct login_cap_t * d, const char * cap, int def);
++void login_close(struct login_cap_t * cap);
++
++#endif /* UTIL_LINUX_LOGIN_CAP_H */
+--- /dev/null	2026-09-21 08:10:21.047999989 +0100
++++ login-utils/login_conf.c	2026-10-16 19:37:54.366806435 +0100
+@@ -0,0 +1,274 @@
++/*
++ *  login_conf.c -- process login.conf(5) files using login_cap(3)
++ *
++ *  Copyright 2026 Jonathan de Boyne Pollard
++ *  This file is based on prior work by Jonathan de Boyne Pollard.
++ *
++ *  This file is free software; you can redistribute it and/or
++ *  modify it under the terms of the GNU Library General Public
++ *  License version 2 as published by the Free Software Foundation.
++ */
++
++#include <errno.h>
++#include <pwd.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdbool.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "c.h"
++#include "env.h"
++#include "xalloc.h"
++#include "login_cap.h"
++#include "login_conf.h"
++
++struct login_cap_t *
++loginconf_getsystem(
++	const struct passwd * pwd
++) {
++	return login_getsystemclass(pwd);
++}
++
++struct login_cap_t *
++loginconf_getuser(
++	const struct passwd * pwd
++) {
++	return login_getuserclass(pwd);
++}
++
++void
++loginconf_close(
++	struct login_cap_t * cap
++) {
++	login_close(cap);
++}
++
++static inline
++int
++append_char_to_string(
++	char ** ps,
++	char c
++) {
++	if (!ps)
++		return -EINVAL;
++	size_t l = strlen(*ps);
++	char * tmp = realloc(*ps, l + 2U);
++	if (!tmp)
++		return -ENOMEM;
++	*ps = tmp;
++	tmp[l++] = c;
++	tmp[l++] = '\0';
++	return 0;
++}
++
++static
++bool
++may_overwrite (
++	const char * var
++) {
++	return
++		/* These may have been declared safe and inherited; so we do not overwrite them. */
++		0 != strcmp(var, "TERM") &&
++		0 != strcmp(var, "COLORTERM")
++		;
++}
++
++static
++void
++vec_set_if (
++	const char * var,
++	bool cond,
++	const char * val
++) {
++	bool overwrite = may_overwrite(var);
++	if (cond)
++		xsetenv(var, val, overwrite);
++	else {
++		if (overwrite) unsetenv(var);
++	}
++}
++
++static
++void
++split_vec_and_set (
++	const struct passwd * pwd,
++	const char * vec
++) {
++	if (!vec) return;
++	char * var = strdup(""), * val = strdup("");
++	char ** cur = &var;
++	for (;;) {
++		char c = *vec++;
++		if (!c) {
++end:
++			vec_set_if(var, &var != cur, val);
++			break;
++		} else
++		if ('\\' == c) {
++			c = *vec++;
++			if (!c) goto end;
++			append_char_to_string(cur, c);
++		} else
++		if ('~' == c) {
++			if (pwd->pw_dir) {
++				xstrappend(cur, pwd->pw_dir);
++				if (*vec && '/' != *vec && *pwd->pw_dir)
++					append_char_to_string(cur, '/');
++			}
++		} else
++		if ('$' == c) {
++			if (pwd->pw_name)
++				xstrappend(cur, pwd->pw_name);
++		} else
++		if (',' == c) {
++			vec_set_if(var, &var != cur, val);
++			cur = &var;
++			*var = *val = '\0';
++		} else
++		if ('=' == c && &var == cur) {
++			cur = &val;
++		} else
++			append_char_to_string(cur, c);
++	}
++	free(val);
++	free(var);
++}
++
++static
++void
++set_vec (
++	const char * cap,
++	const struct passwd * pwd,
++	struct login_cap_t * lc_system,
++	struct login_cap_t * lc_user
++) {
++	const char * val = NULL;
++	val = login_getcapstr(lc_system, cap, NULL, NULL);
++	if (val)
++		split_vec_and_set (pwd, val);
++	val = login_getcapstr(lc_user, cap, NULL, NULL);
++	if (val)
++		split_vec_and_set (pwd, val);
++}
++
++static
++void
++expand_and_set (
++	const struct passwd * pwd,
++	const char * var,
++	const char * val,
++	bool is_path
++) {
++	bool overwrite = may_overwrite(var);
++	if (!val) {
++		if (overwrite) unsetenv(var);
++	} else {
++		char * s = strdup("");
++		for (char c = *val++; c; c = *val++) {
++			if ('\\' == c) {
++				c = *val++;
++				if (!c) break;
++				append_char_to_string(&s, c);
++			} else
++			if ('~' == c) {
++				if (pwd->pw_dir) {
++					xstrappend(&s, pwd->pw_dir);
++					if (*val && '/' != *val && *pwd->pw_dir)
++						append_char_to_string(&s, '/');
++				}
++			} else
++			if ('$' == c) {
++				if (pwd->pw_name)
++					xstrappend(&s, pwd->pw_name);
++			} else
++			if (is_path && isspace(c)) {
++				while (*val && isspace(*val)) ++val;
++				append_char_to_string(&s, ':');
++			} else
++				append_char_to_string(&s, c);
++		}
++		xsetenv(var, s, overwrite);
++		free(s);
++	}
++}
++
++static
++void
++default_str (
++	const char * var,
++	const char * cap,
++	const struct passwd * pwd,
++	struct login_cap_t * lc_system,
++	struct login_cap_t * lc_user,
++	const char * def
++) {
++	const char * val = login_getcapstr(lc_user, cap, def, NULL);
++	if (!val || def == val)
++		val = login_getcapstr(lc_system, cap, def, def);
++	expand_and_set(pwd, var, val, false);
++}
++
++static
++void
++default_pathstr (
++	const char * var,
++	const char * cap,
++	const struct passwd * pwd,
++	struct login_cap_t * lc_system,
++	struct login_cap_t * lc_user,
++	const char * def
++) {
++	const char * val = login_getcapstr(lc_user, cap, def, NULL);
++	if (!val || def == val)
++		val = login_getcapstr(lc_system, cap, def, def);
++	expand_and_set(pwd, var, val, true);
++}
++
++int
++loginconf_get_hushlogin(
++	const struct login_cap_t * lc_system,
++	const struct login_cap_t * lc_user
++) {
++	int r = login_getcapbool(lc_user, "hushlogin", -1);
++	if (0 > r)
++		r = login_getcapbool(lc_system, "hushlogin", -1);
++	return r;
++}
++
++void
++loginconf_set_environ(
++	const struct passwd * pwd,
++	struct login_cap_t * lc_system,
++	struct login_cap_t * lc_user
++) {
++#if BUILD_PG
++	const char * pager = "pg";
++#else
++	const char * pager = "more";
++#endif
++	const char * manpager = pager;
++	const char * www_browser = "www-browser";
++	const char * xml_viewer = NULL;
++
++	// setenv in login.conf can be superseded by all of the rest of the settings.
++	set_vec("setenv", pwd, lc_system, lc_user);
++	// https://sourceware.org/glibc/wiki/Proposals/C.UTF-8
++	default_str("LANG", "lang", pwd, lc_system, lc_user, "C.UTF-8");
++	default_str("MM_CHARSET", "charset", pwd, lc_system, lc_user, "UTF-8");
++	default_pathstr("PATH", "path", pwd, lc_system, lc_user, NULL /* Defaulting this is done by login.defs(5). */);
++	default_pathstr("MANPATH", "manpath", pwd, lc_system, lc_user, NULL);
++	default_pathstr("TERMPATH", "termpath", pwd, lc_system, lc_user, NULL);
++	default_pathstr("TERMINFO_DIRS", "terminfopath", pwd, lc_system, lc_user, NULL);
++	default_str("TERM", "term", pwd, lc_system, lc_user, "ansi" /* Hurrah!  We have finally reached 1976. Progress! */);
++	default_str("COLORTERM", "colorterm", pwd, lc_system, lc_user, NULL);
++	default_str("TZ", "timezone", pwd, lc_system, lc_user, "UTC");
++	default_str("EDITOR", "editor", pwd, lc_system, lc_user, "ex");
++	default_str("VISUAL", "visual", pwd, lc_system, lc_user, "vi");
++	default_str("PAGER", "pager", pwd, lc_system, lc_user, pager);
++	default_str("MANPAGER", "manpager", pwd, lc_system, lc_user, manpager);
++	default_str("MANXMLVIEWER", "manxmlviewer", pwd, lc_system, lc_user, xml_viewer);
++	default_str("WWWBROWSER", "www-browser", pwd, lc_system, lc_user, www_browser);
++	// The caller has already sanitized pw_shell and defaulted it to _PATH_BSHELL if necessary.
++	default_str("SHELL", "shell", pwd, lc_system, lc_user, pwd->pw_shell);
++}
+--- /dev/null	2026-09-21 08:10:21.047999989 +0100
++++ login-utils/login_conf.h	2026-10-16 16:43:27.431195738 +0100
+@@ -0,0 +1,24 @@
++/*
++ *  login_conf.h -- process login.conf(5) files using login_cap(3)
++ *
++ *  Copyright 2026 Jonathan de Boyne Pollard
++ *  This file is based on prior work by Jonathan de Boyne Pollard.
++ *
++ *  This file is free software; you can redistribute it and/or
++ *  modify it under the terms of the GNU Library General Public
++ *  License version 2 as published by the Free Software Foundation.
++ */
++#ifndef UTIL_LINUX_LOGIN_CONF_H
++#define UTIL_LINUX_LOGIN_CONF_H
++
++struct login_cap_t;	/* opaque */
++struct passwd;	/* forward */
++
++struct login_cap_t * loginconf_getsystem(const struct passwd * pwd);
++struct login_cap_t * loginconf_getuser(const struct passwd * pwd);
++void loginconf_close(struct login_cap_t * cap);
++
++int loginconf_get_hushlogin(const struct login_cap_t * lc_system, const struct login_cap_t * lc_user);
++void loginconf_set_environ(const struct passwd * pwd, struct login_cap_t * lc_system, struct login_cap_t * lc_user);
++
++#endif /* UTIL_LINUX_LOGIN_CONF_H */
+--- /dev/null	2026-09-21 08:10:21.047999989 +0100
++++ login-utils/login.conf.5	2026-10-16 19:44:51.194790932 +0100
+@@ -0,0 +1,345 @@
++'\" t
++.\"     Title: login.conf
++.\"    Author: [see the "AUTHOR(S)" section]
++.\" Generator: Asciidoctor 2.0.23
++.\"      Date: 2026-10-16
++.\"    Manual: File formats
++.\"    Source: util-linux 2.42.4
++.\"  Language: English
++.\"
++.TH "LOGIN.CONF" "5" "2026-10-16" "util\-linux 2.42.4" "File formats"
++.ie \n(.g .ds Aq \(aq
++.el       .ds Aq '
++.ss \n[.ss] 0
++.nh
++.ad l
++.de URL
++\fI\\$2\fP <\\$1>\\$3
++..
++.als MTO URL
++.if \n[.g] \{\
++.  mso www.tmac
++.  am URL
++.    ad l
++.  .
++.  am MTO
++.    ad l
++.  .
++.  LINKSTYLE blue R < >
++.\}
++.SH "NAME"
++login.conf \- login configuration files
++.SH "SYNOPSIS"
++.sp
++\fI/etc/login.conf\fP
++\fI~/.login_conf\fP
++.SH "DESCRIPTION"
++.sp
++The \fI/etc/login.conf\fP and \fI~/.login_conf\fP files contain configuration instructions for \fBlogin\fP(1).
++The former applies system\-wide.
++The latter applies to the user(s) whose home directory it is in.
++.sp
++Per\-user capabilities settings override system\-wide settings.
++.sp
++Each file comprises comment lines starting with \*(Aq#\*(Aq, blank lines between records, and record lines.
++Records may optionally be continued on following lines by ending a record line with \*(Aq\(rs\*(Aq.
++.sp
++A record is a series of capabilities, as in a \fBtermcap\fP(5) file, separated by \*(Aq:\*(Aq.
++Leading whitespace before the name of the capability is ignored.
++.sp
++Capabilities take four forms:
++.sp
++.RS 4
++.ie n \{\
++\h'-04' 1.\h'+01'\c
++.\}
++.el \{\
++.  sp -1
++.  IP " 1." 4.2
++.\}
++A single identifier.  This denotes a boolean capability which is set to \fBtrue\fP.
++.RE
++.sp
++.RS 4
++.ie n \{\
++\h'-04' 2.\h'+01'\c
++.\}
++.el \{\
++.  sp -1
++.  IP " 2." 4.2
++.\}
++A single identifier followed by \*(Aq@\*(Aq.  This denotes a boolean capability which is set to \fBfalse\fP.
++.RE
++.sp
++.RS 4
++.ie n \{\
++\h'-04' 3.\h'+01'\c
++.\}
++.el \{\
++.  sp -1
++.  IP " 3." 4.2
++.\}
++A single identifier followed by \*(Aq=\*(Aq and a value.  This denotes a string capability.
++.RE
++.sp
++.RS 4
++.ie n \{\
++\h'-04' 4.\h'+01'\c
++.\}
++.el \{\
++.  sp -1
++.  IP " 4." 4.2
++.\}
++Whitespace.  Usually this is used to continue records over multiple lines without splitting the capability value.  These capabilities are ignored.
++.RE
++.SH "CAPABILITIES"
++.sp
++The very first capability in a record is special.
++It is a vertical bar (\*(Aq|\*(Aq) separated list of the login class names that the record applies to.
++All of the other capabilities are either string capabilities or boolean capabilities.
++.SS "BOOLEAN"
++.sp
++\fBhushlogin\fP
++.RS 4
++This is equivalent to having a \fI~/.hushlogin\fP file, and causes \fBlogin\fP(8) not to print various welcome messages upon login.
++.RE
++.SS "STRING"
++.sp
++String settings specify either filenames to use for messages or values to set environment variables to.
++.sp
++\fBcopyright\fP
++.RS 4
++The name of the file containing a copyright message to print on login.
++.RE
++.sp
++\fBwelcome\fP
++.RS 4
++The name of the file containing a welcome ("message of the day") message to print on login.
++.RE
++.sp
++\fBlogin_prompt\fP
++.RS 4
++The login prompt string to display
++.RE
++.sp
++\fBpasswd_prompt\fP
++.RS 4
++The login prompt string to display
++.RE
++.sp
++\fBeditor\fP
++.RS 4
++The value to set the \f(CREDITOR\fP environment variable to.
++This conventionally names a line\-mode terminal\-based editor.
++If this capability is not set, the default is \fBex\fP(8).
++.RE
++.sp
++\fBvisual\fP
++.RS 4
++The value to set the \f(CRVISUAL\fP environment variable to.
++This conventionally names a full\-screen terminal\-based editor.
++If this capability is not set, the default is \fBvi\fP(8).
++.RE
++.sp
++\fBpager\fP
++.RS 4
++The value to set the \f(CRPAGER\fP environment variable to.
++If this capability is not set, the default is either \fBpg\fP(8) from \fButil\-linux\fP or \fBmore\fP(1).
++.RE
++.sp
++\fBmanpager\fP
++.RS 4
++The value to set the \f(CRMANPAGER\fP environment variable to.
++If this capability is not set, the default is either \fBpg\fP(8) from \fButil\-linux\fP or \fBmore\fP(1).
++.RE
++.sp
++\fBwww\-browser\fP
++.RS 4
++The value to set the \f(CRWWWBROWSER\fP environment variable to.
++If this capability is not set, the default is either \fBwww\-browser\fP(1).
++.RE
++.sp
++\fBtimezone\fP
++.RS 4
++The value to set the \f(CRTZ\fP environment variable to.
++If this capability is not set, the default is \f(CRUTC\fP.
++.RE
++.sp
++\fBpath\fP
++.RS 4
++The value to set the \f(CRPATH\fP environment variable to.
++This is subject to path processing after escape sequence processing.
++.RE
++.sp
++\fBmanpath\fP
++.RS 4
++The value to set the \f(CRMANPATH\fP environment variable to.
++This is subject to path processing after escape sequence processing.
++.RE
++.sp
++\fBtermpath\fP
++.RS 4
++The value to set the \f(CRTERMPATH\fP environment variable to.
++This is subject to path processing after escape sequence processing.
++.RE
++.sp
++\fBterminfopath\fP
++.RS 4
++The value to set the \f(CRTERMINFO_DIRS\fP environment variable to.
++This is subject to path processing after escape sequence processing.
++.RE
++.sp
++\fBmanpath\fP
++.RS 4
++The value to set the \f(CRMANPATH\fP environment variable to.
++This is subject to path processing after escape sequence processing.
++.RE
++.sp
++\fBcharset\fP
++.RS 4
++The value to set the \f(CRMM_CHARSET\fP environment variable to.
++If this capability is not set, the default is \f(CRUTF\-8\fP.
++.RE
++.sp
++\fBlang\fP
++.RS 4
++The value to set the \f(CRLANG\fP environment variable to.
++If this capability is not set, the default is \f(CRC.UTF\-8\fP.
++.RE
++.sp
++\fBshell\fP
++.RS 4
++The value to set the \f(CRSHELL\fP environment variable to.
++.RE
++.sp
++\fBsetenv\fP
++.RS 4
++This specifies multiple environment variables to set not covered by other specialized settings.
++.RE
++.sp
++All string variables first have transformations performed on their values to allow various meta\-characters to be included in the value.
++This is a generic convention for capabilities files.
++The following escape sequences are recognized.
++.RS 3
++.ll -.6i
++.sp
++.if n .RS 4
++.nf
++.fam C
++\(rs0\&   NUL\&   null character
++\(rsb\&   BS\&    backspace
++\(rsr\&   CR\&    carriage return
++\(rsc\&   :\&     colon
++\(rse\&   ESC\&   escape
++\(rst\&   TAB\&   forward tab
++\(rsn\&   LF\&    line feed
++\(rsf\&   FF\&    form\-feed
++\(rs\(rs\&   \(rs\&     backslash
++^C\&         a control character in caret notation
++.fam
++.fi
++.if n .RE
++.br
++.RE
++.ll
++.sp
++String capabilities whose values are subject to path processing are then split into a whitespace\-separated list of path entries.
++A single run of whitespace is converted to a colon (\*(Aq:\*(Aq).
++A tilde (\*(Aq~\*(Aq) is converted into the value of the \f(CRHOME\fP environment variable.
++A dollar symbol (\*(Aq$\*(Aq) is converted into the value of the \f(CRUSER\fP environment variable.
++A backslash can be used to escape whitespace, tildes, and dollar symbols; and has to be used to escape backslashes.
++(In combination with escape processing, this means that backslashes have to be written twice to escape tildes and suchlike, and written four times to become a single backslash.)
++.sp
++The \fBsetenv\fP capability value is treated as a comma\-separated list of \fBname\fP=\fBvalue\fP pairs.
++Tilde (\*(Aq~\*(Aq) and dollar sign (\*(Aq$\*(Aq) characters are expanded as with path processing.
++A backslash can be used to escape whitespace, tildes, dollar symbols, and commas; and has to be used to escape backslashes.
++The environment variable \fBname\fP is to be set to the value \fBvalue\fP; unless \fBvalue\fP is an empty string, which unsets the environment variable \fBname\fP.
++.SH "EXAMPLES"
++.sp
++The following is a typical example of an \fB/etc/login.conf\fP file:
++.sp
++.if n .RS 4
++.nf
++.fam C
++default:\(rs
++        :copyright=/etc/COPYRIGHT:\(rs
++        :welcome=/etc/motd:\(rs
++        :visual=vim:\(rs
++        :editor=ex:\(rs
++        :login_prompt=Login account\(rsc:\(rs
++        :passwd_prompt=Account password\(rsc:\(rs
++        :timezone=Europe/London:\(rs
++        :setenv=MAIL=/var/mail/$,BLOCKSIZE=K,CLICOLOR=1,MAILPATH=~/Maildir/new,ENV=~/.config/shrc:\(rs
++        :path=~/bin /usr/local/bin /usr/pkg/bin /usr/bin:\(rs
++        :termpath=/usr/share/misc/termcap:\(rs
++        :terminfopath=~/.terminfo /usr/local/etc/terminfo /etc/terminfo /usr/pkg/etc/terminfo /usr/share/misc/terminfo:\(rs
++        :manpath=/usr/local/man /usr/local/share/man /usr/pkg/man /usr/share/man /usr/man:\(rs
++        :charset=UTF\-8:\(rs
++        :lang=en_GB.UTF\-8:
++
++root:\(rs
++        :copyright=/etc/COPYRIGHT:\(rs
++        :welcome=/etc/motd:\(rs
++        :visual=vi:\(rs
++        :editor=ex:\(rs
++        :timezone=Europe/London:\(rs
++        :setenv=MAIL=/var/mail/$,BLOCKSIZE=K,CLICOLOR=1,MAILPATH=~/Maildir/new,ENV=~/.config/shrc:\(rs
++        :path=~/bin /usr/local/sbin /usr/local/bin /usr/pkg/sbin /usr/pkg/bin /usr/sbin /usr/bin /sbin /bin:\(rs
++        :termpath=/usr/share/misc/termcap:\(rs
++        :terminfopath=~/.terminfo /usr/local/etc/terminfo /etc/terminfo /usr/pkg/etc/terminfo /usr/share/misc/terminfo:\(rs
++        :manpath=/usr/local/man /usr/local/share/man /usr/pkg/man /usr/share/man /usr/man:\(rs
++        :charset=UTF\-8:\(rs
++        :lang=en_US.UTF\-8:
++.fam
++.fi
++.if n .RE
++.sp
++The following is a typical example of a \fB~/.login_conf\fP file:
++.sp
++.if n .RS 4
++.nf
++.fam C
++me:\(rs
++        :setenv=CC=clang,CXX=clang++:\(rs
++        :visual=nvi:\(rs
++        :editor=nex:\(rs
++        :timezone=America/Los_Angeles:\(rs
++        :shell=/usr/pkg/bin/zsh:\(rs
++        :hushlogin:\(rs
++        :path=~/bin /usr/local/sbin /usr/local/bin /usr/pkg/sbin /usr/pkg/bin /usr/sbin /usr/bin /command:
++.fam
++.fi
++.if n .RE
++.SH "HISTORY"
++.sp
++\fBlogin.conf\fP files come from FreeBSD and NetBSD.
++In NetBSD, the general syntax of capabilities files, use for more than just \fBlogin.conf\fP, is given in \fBcapfile\fP(5).
++.sp
++\fButil\-linux\fP patches to process a subset of the FreeBSD format were written in 2026 by Jonathan de Boyne Pollard.
++.SH "BUGS"
++.sp
++The original FreeBSD file format is two Berkeley DB databases, \fI/etc/login.conf.db\fP and \fI~/.login_conf.db\fP, compiled from the text files for speed of lookup, with a \fBcap_mkdb\fP(1) tool.
++\fButil\-linux\fP does not yet have such tool; nor does it use GDBM files.
++The current \fBlogin\fP(8) program reads the source text files instead.
++.sp
++The BSD\(cqs \fItc\fP capability is not implemented in the \fButil\-linux\fP \fBlogin\fP(8) program.
++Every record has to be given in full.
++.sp
++Despite the examples, FreeBSD\(cqs \fIwelcome\fP, \fIcopyright\fP, \fIlogin_prompt\fP, and \fIpasswd_prompt\fP capabilities are not implemented in the \fButil\-linux\fP \fBlogin\fP(8) program.
++.sp
++The \fBpasswd\fP(5) file does not have a field for a login class.
++The only recognized login classes are \fBdefault\fP, \fBroot\fP, and \fBme\fP.
++.sp
++FreeBSD\(cqs and NetBSD\(cqs \fBlogin.conf\fP(5) manual pages define a lot more settings, which are not implemented here.
++Many of them are not implemented on FreeBSD and NetBSD either.
++.sp
++Numeric capabilities are not implemented.
++Setting resource limits is not yet supported.
++.SH "REPORTING BUGS"
++.sp
++For bug reports, use the \c
++.URL "https://github.com/util\-linux/util\-linux/issues" "issue tracker" "."
++.SH "AVAILABILITY"
++.sp
++\fBlogin.conf\fP is part of the util\-linux package which can be downloaded from \c
++.URL "https://www.kernel.org/pub/linux/utils/util\-linux/" "Linux Kernel Archive" "."
+\ No newline at end of file
+--- /dev/null	2026-09-21 08:10:21.047999989 +0100
++++ login-utils/login.conf.5.adoc	2026-10-16 19:44:46.314791113 +0100
+@@ -0,0 +1,237 @@
++= login.conf(5)
++:doctype: manpage
++:man manual: File formats
++:man source: util-linux {release-version}
++:page-layout: base
++:configfile: login.conf
++
++== NAME
++
++login.conf - login configuration files
++
++== SYNOPSIS
++
++_/etc/login.conf_
++_~/.login_conf_
++
++== DESCRIPTION
++
++The _/etc/login.conf_ and _~/.login_conf_ files contain configuration instructions for *login*(1).
++The former applies system-wide.
++The latter applies to the user(s) whose home directory it is in.
++
++Per-user capabilities settings override system-wide settings.
++
++Each file comprises comment lines starting with '#', blank lines between records, and record lines.
++Records may optionally be continued on following lines by ending a record line with '\'.
++
++A record is a series of capabilities, as in a *termcap*(5) file, separated by ':'.
++Leading whitespace before the name of the capability is ignored.
++
++Capabilities take four forms:
++
++1. A single identifier.  This denotes a boolean capability which is set to *true*.
++2. A single identifier followed by '@'.  This denotes a boolean capability which is set to *false*.
++3. A single identifier followed by '=' and a value.  This denotes a string capability.
++4. Whitespace.  Usually this is used to continue records over multiple lines without splitting the capability value.  These capabilities are ignored.
++
++== CAPABILITIES
++
++The very first capability in a record is special.
++It is a vertical bar ('|') separated list of the login class names that the record applies to.
++All of the other capabilities are either string capabilities or boolean capabilities.
++
++=== BOOLEAN
++
++*hushlogin*::
++This is equivalent to having a _~/.hushlogin_ file, and causes *login*(8) not to print various welcome messages upon login.
++
++=== STRING
++
++String settings specify either filenames to use for messages or values to set environment variables to.
++
++*copyright*::
++The name of the file containing a copyright message to print on login.
++
++*welcome*::
++The name of the file containing a welcome ("message of the day") message to print on login.
++
++*login_prompt*::
++The login prompt string to display
++
++*passwd_prompt*::
++The login prompt string to display
++
++*editor*::
++The value to set the `EDITOR` environment variable to.
++This conventionally names a line-mode terminal-based editor.
++If this capability is not set, the default is *ex*(8).
++
++*visual*::
++The value to set the `VISUAL` environment variable to.
++This conventionally names a full-screen terminal-based editor.
++If this capability is not set, the default is *vi*(8).
++
++*pager*::
++The value to set the `PAGER` environment variable to.
++If this capability is not set, the default is either *pg*(8) from *util-linux* or *more*(1).
++
++*manpager*::
++The value to set the `MANPAGER` environment variable to.
++If this capability is not set, the default is either *pg*(8) from *util-linux* or *more*(1).
++
++*www-browser*::
++The value to set the `WWWBROWSER` environment variable to.
++If this capability is not set, the default is either *www-browser*(1).
++
++*timezone*::
++The value to set the `TZ` environment variable to.
++If this capability is not set, the default is `UTC`.
++
++*path*::
++The value to set the `PATH` environment variable to.
++This is subject to path processing after escape sequence processing.
++
++*manpath*::
++The value to set the `MANPATH` environment variable to.
++This is subject to path processing after escape sequence processing.
++
++*termpath*::
++The value to set the `TERMPATH` environment variable to.
++This is subject to path processing after escape sequence processing.
++
++*terminfopath*::
++The value to set the `TERMINFO_DIRS` environment variable to.
++This is subject to path processing after escape sequence processing.
++
++*manpath*::
++The value to set the `MANPATH` environment variable to.
++This is subject to path processing after escape sequence processing.
++
++*charset*::
++The value to set the `MM_CHARSET` environment variable to.
++If this capability is not set, the default is `UTF-8`.
++
++*lang*::
++The value to set the `LANG` environment variable to.
++If this capability is not set, the default is `C.UTF-8`.
++
++*shell*::
++The value to set the `SHELL` environment variable to.
++
++*setenv*::
++This specifies multiple environment variables to set not covered by other specialized settings.
++
++All string variables first have transformations performed on their values to allow various meta-characters to be included in the value.
++This is a generic convention for capabilities files.
++The following escape sequences are recognized.
++____
++ \0   NUL   null character
++ \b   BS    backspace
++ \r   CR    carriage return
++ \c   :     colon
++ \e   ESC   escape
++ \t   TAB   forward tab
++ \n   LF    line feed
++ \f   FF    form-feed
++ \\   \     backslash
++ ^C         a control character in caret notation
++____
++
++String capabilities whose values are subject to path processing are then split into a whitespace-separated list of path entries.
++A single run of whitespace is converted to a colon (':').
++A tilde ('~') is converted into the value of the `HOME` environment variable.
++A dollar symbol ('$') is converted into the value of the `USER` environment variable.
++A backslash can be used to escape whitespace, tildes, and dollar symbols; and has to be used to escape backslashes.
++(In combination with escape processing, this means that backslashes have to be written twice to escape tildes and suchlike, and written four times to become a single backslash.)
++
++The *setenv* capability value is treated as a comma-separated list of *name*=*value* pairs.
++Tilde ('~') and dollar sign ('$') characters are expanded as with path processing.
++A backslash can be used to escape whitespace, tildes, dollar symbols, and commas; and has to be used to escape backslashes.
++The environment variable *name* is to be set to the value *value*; unless *value* is an empty string, which unsets the environment variable *name*.
++
++== EXAMPLES
++
++The following is a typical example of an */etc/login.conf* file:
++
++....
++default:\
++        :copyright=/etc/COPYRIGHT:\
++        :welcome=/etc/motd:\
++        :visual=vim:\
++        :editor=ex:\
++        :login_prompt=Login account\c:\
++        :passwd_prompt=Account password\c:\
++        :timezone=Europe/London:\
++        :setenv=MAIL=/var/mail/$,BLOCKSIZE=K,CLICOLOR=1,MAILPATH=~/Maildir/new,ENV=~/.config/shrc:\
++        :path=~/bin /usr/local/bin /usr/pkg/bin /usr/bin:\
++        :termpath=/usr/share/misc/termcap:\
++	:terminfopath=~/.terminfo /usr/local/etc/terminfo /etc/terminfo /usr/pkg/etc/terminfo /usr/share/misc/terminfo:\
++        :manpath=/usr/local/man /usr/local/share/man /usr/pkg/man /usr/share/man /usr/man:\
++        :charset=UTF-8:\
++        :lang=en_GB.UTF-8:
++
++root:\
++        :copyright=/etc/COPYRIGHT:\
++        :welcome=/etc/motd:\
++        :visual=vi:\
++        :editor=ex:\
++        :timezone=Europe/London:\
++        :setenv=MAIL=/var/mail/$,BLOCKSIZE=K,CLICOLOR=1,MAILPATH=~/Maildir/new,ENV=~/.config/shrc:\
++        :path=~/bin /usr/local/sbin /usr/local/bin /usr/pkg/sbin /usr/pkg/bin /usr/sbin /usr/bin /sbin /bin:\
++        :termpath=/usr/share/misc/termcap:\
++	:terminfopath=~/.terminfo /usr/local/etc/terminfo /etc/terminfo /usr/pkg/etc/terminfo /usr/share/misc/terminfo:\
++        :manpath=/usr/local/man /usr/local/share/man /usr/pkg/man /usr/share/man /usr/man:\
++        :charset=UTF-8:\
++        :lang=en_US.UTF-8:
++
++....
++
++The following is a typical example of a *~/.login_conf* file:
++
++....
++me:\
++        :setenv=CC=clang,CXX=clang++:\
++        :visual=nvi:\
++        :editor=nex:\
++        :timezone=America/Los_Angeles:\
++        :shell=/usr/pkg/bin/zsh:\
++        :hushlogin:\
++        :path=~/bin /usr/local/sbin /usr/local/bin /usr/pkg/sbin /usr/pkg/bin /usr/sbin /usr/bin /command:
++
++....
++
++== HISTORY
++
++*login.conf* files come from FreeBSD and NetBSD.
++In NetBSD, the general syntax of capabilities files, use for more than just *login.conf*, is given in *capfile*(5).
++
++*util-linux* patches to process a subset of the FreeBSD format were written in 2026 by Jonathan de Boyne Pollard.
++
++== BUGS
++
++The original FreeBSD file format is two Berkeley DB databases, _/etc/login.conf.db_ and _~/.login_conf.db_, compiled from the text files for speed of lookup, with a *cap_mkdb*(1) tool.
++*util-linux* does not yet have such tool; nor does it use GDBM files.
++The current *login*(8) program reads the source text files instead.
++
++The BSD's _tc_ capability is not implemented in the *util-linux* *login*(8) program.
++Every record has to be given in full.
++
++Despite the examples, FreeBSD's _welcome_, _copyright_, _login_prompt_, and _passwd_prompt_ capabilities are not implemented in the *util-linux* *login*(8) program.
++
++The *passwd*(5) file does not have a field for a login class.
++The only recognized login classes are *default*, *root*, and *me*.
++
++FreeBSD's and NetBSD's *login.conf*(5) manual pages define a lot more settings, which are not implemented here.
++Many of them are not implemented on FreeBSD and NetBSD either.
++
++Numeric capabilities are not implemented.
++Setting resource limits is not yet supported.
++
++include::man-common/bugreports.adoc[]
++
++include::man-common/footer-config.adoc[]
++
++ifdef::translation[]
++include::man-common/translation.adoc[]
++endif::[]
