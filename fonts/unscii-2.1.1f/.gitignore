@@ -5,3 +5,4 @@ config
 source
 dist
 *.tar.gz
+*.tar.bz2
