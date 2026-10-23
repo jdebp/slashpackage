@@ -5,10 +5,10 @@
  esac
  
 +case $variant in
-+  freebsd*)
++  (freebsd*|gnu)
 +    _arguments -A '--*' -s '--help[Display option help]' --
-+  ;|
-+  *)
++  ;&
++  (*)
  _values -w 'option' $vals
 +  ;;
 +esac
