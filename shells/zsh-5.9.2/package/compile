@@ -59,7 +59,27 @@ case "`uname`" in
 esac
 (
 	cd build
-	test -r config.status || sh ./configure --prefix="${target}" --build="$(slashpackage_target)" --libdir="${target}"/library --mandir="${target}"/manual --bindir="${target}"/command --enable-etcdir="${target}"/config/startup --enable-fndir="${target}"/config/functions --enable-site-fndir="${target}"/config/site-functions --enable-scriptdir="${target}"/config/scripts --enable-site-scriptdir="${target}"/config/site-scripts --enable-runhelpdir="${target}"/config/help --enable-maildir-support --enable-multibyte --enable-year2038 --enable-function-subdirs --enable-unicode9 --enable-cppflags='-isystem /usr/pkg/include' --enable-ldflags='-L /usr/pkg/lib'
+	test -r config.status ||
+		sh ./configure \
+			--prefix="${target}" \
+			--build="$(slashpackage_target)" \
+			--libdir="${target}"/library \
+			--mandir="${target}"/manual \
+			--bindir="${target}"/command \
+			--enable-etcdir="${target}"/config/startup \
+			--enable-fndir="${target}"/config/functions \
+			--enable-site-fndir="${target}"/config/site-functions \
+			--enable-scriptdir="${target}"/config/scripts \
+			--enable-site-scriptdir="${target}"/config/site-scripts \
+			--enable-runhelpdir="${target}"/config/help \
+			--enable-maildir-support \
+			--enable-multibyte \
+			--enable-year2038 \
+			--enable-function-subdirs \
+			--enable-unicode9 \
+			--enable-cppflags='-isystem /usr/pkg/include' \
+			--enable-ldflags='-L /usr/pkg/lib' \
+			--enable-additional-fpath="${target}"/config/vendor-functions,"${target}"/config/vendor-completions
 	"${make}" ${cpus:+ -j "${cpus}"}
 )
 
@@ -87,7 +107,6 @@ do
 	strip -p -- library/"${dest}"{new}
 	chmod 0555 library/"${dest}"{new}
 done
-collapse_utf8_man_0
 # Symbolic links in place of subdirectories to fool the dynamic linking
 for directory in "${name}" "${version}"
 do
@@ -132,7 +151,7 @@ do
 	rm -f -- config/"${dest}"{new}
 	install -m 0644 -p -- "${fn}" config/"${dest}"{new}
 done
-for dest in site-functions site-scripts
+for dest in site-functions site-scripts vendor-functions vendor-completions
 do
 	rm -f -- config/"${dest}"{new}
 	ln -f -s -- "${shrbase}"/"${dest}" config/"${dest}"{new}
@@ -194,18 +213,9 @@ do
 	dest=functions/Completion/"${dirname}"/"$(basename "${rawname}")"
 	mv -f -- config/"${dest}"{new} config/"${dest}"
 done
-for dest in site-functions site-scripts startup
+for dest in site-functions site-scripts startup vendor-functions vendor-completions
 do
-	case "`uname`" in
-	(Linux)
-		test -e config/"${dest}" && mv -f -- config/"${dest}" config/"${dest}"{old}
-		mv -f -- config/"${dest}"{new} config/"${dest}"
-		rm -f -- config/"${dest}"{old}
-		;;
-	(*)
-		mv -f -h -- config/"${dest}"{new} config/"${dest}"
-		;;
-	esac
+	rename_symbolic_link config/"${dest}"{new} config/"${dest}"
 done
 # All of the help
 find build/Doc/help/ -type f \! -name '.*' |
