@@ -1,1 +1,8 @@
 vtfontcvt
+bdf2hex.pl
+bdftotext.pl
+hex2bdf.pl
+hex2yaff.pl
+hex-sort.pl
+yafftotext.pl
+drawtotext.pl
