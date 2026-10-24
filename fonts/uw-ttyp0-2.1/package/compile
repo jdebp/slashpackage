@@ -16,7 +16,7 @@ source_archive() {
 	SHA256='-'
 	SIZE='-'
 }
-buildtools=
+buildtools=fonttosfnt
 
 fetch_or_checkout_source
 
