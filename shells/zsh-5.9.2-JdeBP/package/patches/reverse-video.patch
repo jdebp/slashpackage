@@ -1,0 +1,220 @@
+--- Src/zsh.h	2026-07-12 18:36:06.000000000 +0100
++++ Src/zsh.h	2026-10-23 20:41:34.936169683 +0100
+@@ -2660,7 +2660,8 @@
+ #define TCBACKSPACE    31
+ #define TCFGCOLOUR     32
+ #define TCBGCOLOUR     33
+-#define TC_COUNT       34
++#define TCREVERSEBEG   34
++#define TC_COUNT       35
+ 
+ #define tccan(X) (tclen[X])
+ 
+@@ -2679,22 +2680,24 @@
+ #define TXTUNDERLINE  0x0004
+ #define TXTFGCOLOUR   0x0008
+ #define TXTBGCOLOUR   0x0010
++#define TXTREVERSE    0x0020
+ 
+-#define TXT_ATTR_ON_MASK   0x001F
++#define TXT_ATTR_ON_MASK   0x003F
+ 
+ #define txtisset(X)  (txtattrmask & (X))
+ #define txtset(X)    (txtattrmask |= (X))
+ #define txtunset(X)  (txtattrmask &= ~(X))
+ 
+-#define TXTNOBOLDFACE	0x0020
+-#define TXTNOSTANDOUT	0x0040
+-#define TXTNOUNDERLINE	0x0080
+-#define TXTNOFGCOLOUR	0x0100
+-#define TXTNOBGCOLOUR	0x0200
++#define TXTNOBOLDFACE	0x0040
++#define TXTNOSTANDOUT	0x0080
++#define TXTNOUNDERLINE	0x0100
++#define TXTNOFGCOLOUR	0x0200
++#define TXTNOBGCOLOUR	0x0400
++#define TXTNOREVERSE    0x0800
+ 
+-#define TXT_ATTR_OFF_MASK  0x03E0
++#define TXT_ATTR_OFF_MASK  0x0FC0
+ /* Bits to shift off right to get on */
+-#define TXT_ATTR_OFF_ON_SHIFT 5
++#define TXT_ATTR_OFF_ON_SHIFT 6
+ #define TXT_ATTR_OFF_FROM_ON(attr)	\
+     (((attr) & TXT_ATTR_ON_MASK) << TXT_ATTR_OFF_ON_SHIFT)
+ #define TXT_ATTR_ON_FROM_OFF(attr)	\
+@@ -2703,10 +2706,10 @@
+  * Indicates to zle_refresh.c that the character entry is an
+  * index into the list of multiword symbols.
+  */
+-#define TXT_MULTIWORD_MASK  0x0400
++#define TXT_MULTIWORD_MASK  0x0800
+ 
+ /* used when, e.g an invalid colour is specified */
+-#define TXT_ERROR 0x0800
++#define TXT_ERROR 0x8000
+ 
+ /* Mask for colour to use in foreground */
+ #define TXT_ATTR_FG_COL_MASK     0x000000FFFFFF0000
+--- Src/prompt.c	2026-07-12 18:36:06.000000000 +0100
++++ Src/prompt.c	2026-10-23 20:41:34.936169683 +0100
+@@ -548,6 +548,16 @@
+ 		txtunset(TXTUNDERLINE);
+ 		tsetcap(TCUNDERLINEEND, TSC_PROMPT|TSC_DIRTY);
+ 		break;
++	    case 'O':
++		txtchangeset(txtchangep, TXTREVERSE, TXTNOREVERSE);
++		txtset(TXTREVERSE);
++		tsetcap(TCREVERSEBEG, TSC_PROMPT);
++		break;
++	    case 'o':
++		txtchangeset(txtchangep, TXTNOREVERSE, TXTREVERSE);
++		txtunset(TXTREVERSE);
++		tsetcap(TCALLATTRSOFF, TSC_PROMPT|TSC_DIRTY);
++		break;
+ 	    case 'F':
+ 		atr = parsecolorchar(arg, 1);
+ 		if (!(atr & (TXT_ERROR | TXTNOFGCOLOUR))) {
+@@ -1054,6 +1064,8 @@
+ 		tsetcap(TCSTANDOUTBEG, flags);
+ 	    if (txtisset(TXTUNDERLINE))
+ 		tsetcap(TCUNDERLINEBEG, flags);
++	    if (txtisset(TXTREVERSE))
++		tsetcap(TCREVERSEBEG, flags);
+ 	    if (txtisset(TXTFGCOLOUR))
+ 		set_colour_attribute(txtattrmask, COL_SEQ_FG, flags);
+ 	    if (txtisset(TXTBGCOLOUR))
+@@ -1611,6 +1623,7 @@
+     { "bold", TXTBOLDFACE, 0 },
+     { "standout", TXTSTANDOUT, 0 },
+     { "underline", TXTUNDERLINE, 0 },
++    { "reverse", TXTREVERSE, 0 },
+     { NULL, 0, 0 }
+ };
+ 
+--- Src/Modules/watch.c	2026-07-12 18:36:06.000000000 +0100
++++ Src/Modules/watch.c	2026-10-23 20:41:34.940169683 +0100
+@@ -407,6 +407,14 @@
+ 		    txtunset(TXTUNDERLINE);
+ 		    tsetcap(TCUNDERLINEEND, TSC_RAW|TSC_DIRTY);
+ 		    break;
++		case 'O':
++		    txtset(TXTREVERSE);
++		    tsetcap(TCREVERSEBEG, TSC_RAW|TSC_DIRTY);
++		    break;
++		case 'o':
++		    txtunset(TXTREVERSE);
++		    tsetcap(TCALLATTRSOFF, TSC_RAW|TSC_DIRTY);
++		    break;
+ 		default:
+ 		    putchar('%');
+ 		    putchar(*fm2);
+--- Src/init.c	2026-07-12 18:36:06.000000000 +0100
++++ Src/init.c	2026-10-23 20:41:34.940169683 +0100
+@@ -752,7 +752,8 @@
+     "cl", "le", "LE", "nd", "RI", "up", "UP", "do",
+     "DO", "dc", "DC", "ic", "IC", "cd", "ce", "al", "dl", "ta",
+     "md", "so", "us", "me", "se", "ue", "ch",
+-    "ku", "kd", "kl", "kr", "sc", "rc", "bc", "AF", "AB"
++    "ku", "kd", "kl", "kr", "sc", "rc", "bc", "AF", "AB",
++    "mr"
+ };
+ 
+ /**/
+--- Src/Zle/zle_refresh.c	2026-07-12 18:36:06.000000000 +0100
++++ Src/Zle/zle_refresh.c	2026-10-23 20:41:34.940169683 +0100
+@@ -956,6 +956,8 @@
+ 	tsetcap(TCSTANDOUTBEG, 0);
+     if (txtchangeisset(atr, TXTUNDERLINE))
+ 	tsetcap(TCUNDERLINEBEG, 0);
++    if (txtchangeisset(atr, TXTREVERSE))
++	tsetcap(TCREVERSEBEG, 0);
+     if (txtchangeisset(atr, TXTFGCOLOUR|TXTNOFGCOLOUR))
+ 	set_colour_attribute(atr, COL_SEQ_FG, 0);
+     if (txtchangeisset(atr, TXTBGCOLOUR|TXTNOBGCOLOUR))
+--- Src/Zle/zle_tricky.c	2026-07-12 18:36:06.000000000 +0100
++++ Src/Zle/zle_tricky.c	2026-10-23 20:41:34.940169683 +0100
+@@ -2426,7 +2426,7 @@
+ printfmt(char *fmt, int n, int dopr, int doesc)
+ {
+     char *p = fmt, nc[DIGBUFSIZE];
+-    int l = 0, cc = 0, b = 0, s = 0, u = 0, m;
++    int l = 0, cc = 0, b = 0, s = 0, u = 0, r = 0, m;
+ 
+     MB_METACHARINIT();
+     for (; *p; ) {
+@@ -2480,6 +2480,16 @@
+ 		    if (dopr)
+ 			tcout(TCUNDERLINEEND);
+ 		    break;
++		case 'R':
++		    r = 1;
++		    if (dopr)
++			tcout(TCREVERSEBEG);
++		    break;
++		case 'r':
++		    r = 0; m = 1;
++		    if (dopr)
++			tcout(TCALLATTRSOFF);
++		    break;
+ 		case 'F':
+ 		case 'K':
+ 		    is_fg = (*p == 'F');
+@@ -2527,6 +2537,8 @@
+ 			tcout(TCSTANDOUTBEG);
+ 		    if (u)
+ 			tcout(TCUNDERLINEBEG);
++		    if (r)
++			tcout(TCREVERSEBEG);
+ 		}
+ 	    } else
+ 		break;
+--- Src/Zle/complist.c	2026-07-12 18:36:06.000000000 +0100
++++ Src/Zle/complist.c	2026-10-23 20:41:34.940169683 +0100
+@@ -1072,7 +1072,7 @@
+ compprintfmt(char *fmt, int n, int dopr, int doesc, int ml, int *stop)
+ {
+     char *p, nc[2*DIGBUFSIZE + 12], nbuf[2*DIGBUFSIZE + 12];
+-    int l = 0, cc = 0, b = 0, s = 0, u = 0, m, ask, beg, stat;
++    int l = 0, cc = 0, b = 0, s = 0, u = 0, r = 0, m, ask, beg, stat;
+ 
+     if ((stat = !fmt)) {
+ 	if (mlbeg >= 0) {
+@@ -1161,6 +1161,16 @@
+ 		    if (dopr)
+ 			tcout(TCUNDERLINEEND);
+ 		    break;
++		case ZWC('R'):
++		    r = 1;
++		    if (dopr)
++			tcout(TCREVERSEBEG);
++		    break;
++		case ZWC('r'):
++		    r = 0; m = 1;
++		    if (dopr)
++			tcout(TCALLATTRSOFF);
++		    break;
+ 		case ZWC('F'):
+ 		case ZWC('K'):
+ 		    is_fg = (cchar == ZWC('F'));
+@@ -1261,6 +1271,8 @@
+ 			tcout(TCSTANDOUTBEG);
+ 		    if (u)
+ 			tcout(TCUNDERLINEBEG);
++		    if (r)
++			tcout(TCREVERSEBEG);
+ 		}
+ 	    } else
+ 		break;
+--- Doc/zshmisc.1	2026-07-12 19:42:12.000000000 +0100
++++ Doc/zshmisc.1	2026-10-23 20:41:34.940169683 +0100
+@@ -2605,6 +2605,9 @@
+ \fB%S\fP (\fB%s\fP)
+ Start (stop) standout mode\&.
+ .TP
++\fB%O\fP (\fB%o\fP)
++Start (stop) reverse video mode\&.
++.TP
+ \fB%F\fP (\fB%f\fP)
+ Start (stop) using a different foreground colour, if supported
+ by the terminal\&.  The colour may be specified two ways: either
