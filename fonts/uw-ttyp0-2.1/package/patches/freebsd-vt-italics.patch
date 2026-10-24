@@ -1,0 +1,99 @@
+--- ../dist/uw-ttyp0-2.1/Makefile.in	2025-09-14 13:43:51.000000000 +0100
++++ Makefile.in	2026-10-24 15:57:13.281590745 +0100
+@@ -85,8 +85,9 @@
+ 
+ ifeq ($(strip $(GEN_CONS_FREEBSD_VT)),1)
+   include TARGETS_CONS_FREEBSD_VT.dat
+-  consfreebsdvtpattern = genconsfreebsdvt/ttyp0-$(s).fnt
+-  consfreebsdvt := $(foreach s, $(SIZES_CONS_FREEBSD_VT), $(consfreebsdvtpattern))
++  consfreebsdvtpatternr = genconsfreebsdvt/ttyp0-r-$(s).fnt
++  consfreebsdvtpatterni = genconsfreebsdvt/ttyp0-i-$(s).fnt
++  consfreebsdvt := $(foreach s, $(SIZES_CONS_FREEBSD_VT), $(consfreebsdvtpatternr)) $(foreach s, $(SIZES_CONS_FREEBSD_VT), $(consfreebsdvtpatterni))
+ endif
+ 
+ ifeq ($(strip $(GEN_CONS_FREEBSD_SC)),1)
+@@ -689,32 +690,58 @@
+ # ------------------------------------------------------------------------
+ # console fonts for FreeBSD (vt)
+ 
+-genconsfreebsdvt/ttyp0-11.fnt : genbdf/t0-11-uni.bdf genbdf/t0-11b-uni.bdf
+-	$(VTFONTCVT) -w 6 -h 11 genbdf/t0-11-uni.bdf genbdf/t0-11b-uni.bdf genconsfreebsdvt/ttyp0-11.fnt
+-genconsfreebsdvt/ttyp0-12.fnt : genbdf/t0-12-uni.bdf genbdf/t0-12b-uni.bdf
+-	$(VTFONTCVT) -w 6 -h 12 genbdf/t0-12-uni.bdf genbdf/t0-12b-uni.bdf genconsfreebsdvt/ttyp0-12.fnt
+-genconsfreebsdvt/ttyp0-13.fnt : genbdf/t0-13-uni.bdf genbdf/t0-13b-uni.bdf
+-	$(VTFONTCVT) -w 7 -h 13 genbdf/t0-13-uni.bdf genbdf/t0-13b-uni.bdf genconsfreebsdvt/ttyp0-13.fnt
+-genconsfreebsdvt/ttyp0-14.fnt : genbdf/t0-14-uni.bdf genbdf/t0-14b-uni.bdf
+-	$(VTFONTCVT) -w 7 -h 14 genbdf/t0-14-uni.bdf genbdf/t0-14b-uni.bdf genconsfreebsdvt/ttyp0-14.fnt
+-genconsfreebsdvt/ttyp0-15.fnt : genbdf/t0-15-uni.bdf genbdf/t0-15b-uni.bdf
+-	$(VTFONTCVT) -w 8 -h 15 genbdf/t0-15-uni.bdf genbdf/t0-15b-uni.bdf genconsfreebsdvt/ttyp0-15.fnt
+-genconsfreebsdvt/ttyp0-16.fnt : genbdf/t0-16-uni.bdf genbdf/t0-16b-uni.bdf
+-	$(VTFONTCVT) -w 8 -h 16 genbdf/t0-16-uni.bdf genbdf/t0-16b-uni.bdf genconsfreebsdvt/ttyp0-16.fnt
+-genconsfreebsdvt/ttyp0-17.fnt : genbdf/t0-17-uni.bdf genbdf/t0-17b-uni.bdf
+-	$(VTFONTCVT) -w 9 -h 17 genbdf/t0-17-uni.bdf genbdf/t0-17b-uni.bdf genconsfreebsdvt/ttyp0-17.fnt
+-genconsfreebsdvt/ttyp0-18.fnt : genbdf/t0-18-uni.bdf genbdf/t0-18b-uni.bdf
+-	$(VTFONTCVT) -w 9 -h 18 genbdf/t0-18-uni.bdf genbdf/t0-18b-uni.bdf genconsfreebsdvt/ttyp0-18.fnt
+-genconsfreebsdvt/ttyp0-22.fnt : genbdf/t0-22-uni.bdf genbdf/t0-22b-uni.bdf
+-	$(VTFONTCVT) -w 11 -h 22 genbdf/t0-22-uni.bdf genbdf/t0-22b-uni.bdf genconsfreebsdvt/ttyp0-22.fnt
+-genconsfreebsdvt/ttyp0-30.fnt : genbdf/t0-30-uni.bdf genbdf/t0-30b-uni.bdf
+-	$(VTFONTCVT) -w 14 -h 30 genbdf/t0-30-uni.bdf genbdf/t0-30b-uni.bdf genconsfreebsdvt/ttyp0-30.fnt
+-genconsfreebsdvt/ttyp0-40.fnt : genbdf/t0-40-uni.bdf genbdf/t0-40b-uni.bdf
+-	$(VTFONTCVT) -w 18 -h 40 genbdf/t0-40-uni.bdf genbdf/t0-40b-uni.bdf genconsfreebsdvt/ttyp0-40.fnt
+-genconsfreebsdvt/ttyp0-60.fnt : genbdf/t0-60-uni.bdf genbdf/t0-60b-uni.bdf
+-	$(VTFONTCVT) -w 28 -h 60 genbdf/t0-60-uni.bdf genbdf/t0-60b-uni.bdf genconsfreebsdvt/ttyp0-60.fnt
+-genconsfreebsdvt/ttyp0-80.fnt : genbdf/t0-80-uni.bdf genbdf/t0-80b-uni.bdf
+-	$(VTFONTCVT) -w 36 -h 80 genbdf/t0-80-uni.bdf genbdf/t0-80b-uni.bdf genconsfreebsdvt/ttyp0-80.fnt
++genconsfreebsdvt/ttyp0-r-11.fnt : genbdf/t0-11-uni.bdf genbdf/t0-11b-uni.bdf
++	$(VTFONTCVT) -w 6 -h 11 $^ $@
++genconsfreebsdvt/ttyp0-r-12.fnt : genbdf/t0-12-uni.bdf genbdf/t0-12b-uni.bdf
++	$(VTFONTCVT) -w 6 -h 12 $^ $@
++genconsfreebsdvt/ttyp0-r-13.fnt : genbdf/t0-13-uni.bdf genbdf/t0-13b-uni.bdf
++	$(VTFONTCVT) -w 7 -h 13 $^ $@
++genconsfreebsdvt/ttyp0-r-14.fnt : genbdf/t0-14-uni.bdf genbdf/t0-14b-uni.bdf
++	$(VTFONTCVT) -w 7 -h 14 $^ $@
++genconsfreebsdvt/ttyp0-r-15.fnt : genbdf/t0-15-uni.bdf genbdf/t0-15b-uni.bdf
++	$(VTFONTCVT) -w 8 -h 15 $^ $@
++genconsfreebsdvt/ttyp0-r-16.fnt : genbdf/t0-16-uni.bdf genbdf/t0-16b-uni.bdf
++	$(VTFONTCVT) -w 8 -h 16 $^ $@
++genconsfreebsdvt/ttyp0-r-17.fnt : genbdf/t0-17-uni.bdf genbdf/t0-17b-uni.bdf
++	$(VTFONTCVT) -w 9 -h 17 $^ $@
++genconsfreebsdvt/ttyp0-r-18.fnt : genbdf/t0-18-uni.bdf genbdf/t0-18b-uni.bdf
++	$(VTFONTCVT) -w 9 -h 18 $^ $@
++genconsfreebsdvt/ttyp0-r-22.fnt : genbdf/t0-22-uni.bdf genbdf/t0-22b-uni.bdf
++	$(VTFONTCVT) -w 11 -h 22 $^ $@
++genconsfreebsdvt/ttyp0-r-30.fnt : genbdf/t0-30-uni.bdf genbdf/t0-30b-uni.bdf
++	$(VTFONTCVT) -w 14 -h 30 $^ $@
++genconsfreebsdvt/ttyp0-r-40.fnt : genbdf/t0-40-uni.bdf genbdf/t0-40b-uni.bdf
++	$(VTFONTCVT) -w 18 -h 40 $^ $@
++genconsfreebsdvt/ttyp0-r-60.fnt : genbdf/t0-60-uni.bdf genbdf/t0-60b-uni.bdf
++	$(VTFONTCVT) -w 28 -h 60 $^ $@
++genconsfreebsdvt/ttyp0-r-80.fnt : genbdf/t0-80-uni.bdf genbdf/t0-80b-uni.bdf
++	$(VTFONTCVT) -w 36 -h 80 $^ $@
++genconsfreebsdvt/ttyp0-i-11.fnt : genbdf/t0-11i-uni.bdf
++	$(VTFONTCVT) -w 6 -h 11 $^ $@
++genconsfreebsdvt/ttyp0-i-12.fnt : genbdf/t0-12i-uni.bdf
++	$(VTFONTCVT) -w 6 -h 12 $^ $@
++genconsfreebsdvt/ttyp0-i-13.fnt : genbdf/t0-13i-uni.bdf
++	$(VTFONTCVT) -w 7 -h 13 $^ $@
++genconsfreebsdvt/ttyp0-i-14.fnt : genbdf/t0-14i-uni.bdf
++	$(VTFONTCVT) -w 7 -h 14 $^ $@
++genconsfreebsdvt/ttyp0-i-15.fnt : genbdf/t0-15i-uni.bdf
++	$(VTFONTCVT) -w 8 -h 15 $^ $@
++genconsfreebsdvt/ttyp0-i-16.fnt : genbdf/t0-16i-uni.bdf
++	$(VTFONTCVT) -w 8 -h 16 $^ $@
++genconsfreebsdvt/ttyp0-i-17.fnt : genbdf/t0-17i-uni.bdf
++	$(VTFONTCVT) -w 9 -h 17 $^ $@
++genconsfreebsdvt/ttyp0-i-18.fnt : genbdf/t0-18i-uni.bdf
++	$(VTFONTCVT) -w 9 -h 18 $^ $@
++genconsfreebsdvt/ttyp0-i-22.fnt : genbdf/t0-22i-uni.bdf
++	$(VTFONTCVT) -w 11 -h 22 $^ $@
++genconsfreebsdvt/ttyp0-i-30.fnt : genbdf/t0-30i-uni.bdf
++	$(VTFONTCVT) -w 14 -h 30 $^ $@
++genconsfreebsdvt/ttyp0-i-40.fnt : genbdf/t0-40i-uni.bdf
++	$(VTFONTCVT) -w 18 -h 40 $^ $@
++genconsfreebsdvt/ttyp0-i-60.fnt : genbdf/t0-60i-uni.bdf
++	$(VTFONTCVT) -w 28 -h 60 $^ $@
++genconsfreebsdvt/ttyp0-i-80.fnt : genbdf/t0-80i-uni.bdf
++	$(VTFONTCVT) -w 36 -h 80 $^ $@
+ 
+ 
+ # ------------------------------------------------------------------------

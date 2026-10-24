@@ -1,0 +1,50 @@
+#!/bin/sh -
+# Quick shim to translate vtfontcvt usage by the makefile into the Unscii conversion tools.
+# This is for platforms that do not have FreeBSD's vtfontcvt(8).
+#
+# Note that width and height are preserved in font metadata by the Unscii toolchain, and the -w and -h options to this script are superfluous.
+#
+# Copyright 2026 Jonathan de Boyne Pollard.
+# Public Domain is not a thing in U.K. law, so this is MIT "Expat"/ISC/2 Clause BSD/FreeBSD licenced.
+#
+# vim: ft=zsh sw=2 sts=2 ts=2 noet:
+if ! args=$(getopt w:h: $*)
+then
+	echo 1>&2 Bad options.
+	exit 111
+fi
+set -- $args
+while true
+do
+	case $1 in
+		(-w)	w=$2; shift; shift ;;
+		(-h)	h=$2; shift; shift ;;
+		(--)	      shift; break ;;
+		(-*)
+			echo 1>&2 Bad options.
+			exit 111
+	esac
+done
+while test 1 -lt $#
+do
+	bdf2hex.pl < $1 > $1.hex || exit $?
+	shift
+done
+set -- $args
+while true
+do
+	case $1 in
+		(--)	shift; break ;;
+		(-*)	shift; shift ;;
+	esac
+done
+if test 2 -lt $#
+then
+	exec vtfontcvt ${w:+--width $w} ${h:+--height $h} $1.hex $2.hex > $3
+elif test 1 -lt $#
+then
+	exec vtfontcvt ${w:+--width $w} ${h:+--height $h} $1.hex > $2
+else
+	echo 1>&2 Bad arguments.
+	exit 111
+fi
