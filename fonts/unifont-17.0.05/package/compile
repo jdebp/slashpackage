@@ -23,6 +23,7 @@ fetch_or_checkout_source
 export CDPATH=
 
 clone_source_to_build
+check_buildtools
 
 # Rebuild.
 if ! > /dev/null expr "${MAKEFLAGS}" : "--jobs" &&
@@ -39,7 +40,14 @@ fi
 ) |
 while read -r font
 do
-	vtfontcvt build/font/precompiled/"${font}".hex build/font/precompiled/"${font}".fnt
+	if vtfontcvt --version > /dev/null
+	then
+		vtfontcvt build/font/precompiled/"${font}".hex > build/font/precompiled/"${font}".fnt.tmp
+		mv -- build/font/precompiled/"${font}".fnt.tmp build/font/precompiled/"${font}".fnt
+	else
+		vtfontcvt build/font/precompiled/"${font}".hex build/font/precompiled/"${font}".fnt.tmp
+		mv -- build/font/precompiled/"${font}".fnt.tmp build/font/precompiled/"${font}".fnt
+	fi
 done
 
 # Atomically update the release directories ./command, ./library, ./include, and so forth.
