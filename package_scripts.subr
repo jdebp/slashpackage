@@ -313,6 +313,33 @@ install_manual_section_0() {
 		ln -f -s -- "${command}".${section} manual/"${language}"/man${section}/"${alias}".${section}{new}
 	done
 }
+install_docbook_manuals_0() {
+	local section mansubdir="${1:-.}" language="${2:-.}"
+
+	for section in 1 2 3 4 5 6 7 8 9
+	do
+		# All of the commands that have their own manual pages
+		(
+			! test -r package/commands${section} || cat package/commands${section}
+			! test -r package/extra-manpages${section} || cat package/extra-manpages${section}
+		) |
+		while read -r i
+		do
+			install -m 0755 -d -- manual/${language}/docbook${section} manual/${language}/docbook${section}
+			rm -f -- manual/"${i}".xml{new}
+			install -m 0444 -p -- build/"${mansubdir}"/"${language}"/"${i}".xml manual/${language}/docbook${section}/"${i}".xml{new}
+		done
+		# All of the manual pages for aliases
+		! test -r package/aliases${section} || cat package/aliases${section} |
+		while read -r command alias
+		do
+			! test -r package/commands${section} || ! grep -q -- "^${alias}\$" package/commands${section} || continue
+			! test -r package/extra-manpages${section} || ! grep -q -- "^${alias}\$" package/extra-manpages${section} || continue
+			rm -f -- manual/${language}/docbook${section}/"${alias}".xml{new}
+			ln -f -- manual/${language}/docbook${section}/"${command}".xml{new} manual/${language}/docbook${section}/"${alias}".xml{new}
+		done
+	done
+}
 
 # ##############################################################################
 # Installing commands to ./command and manual pages to ./manual, finalization phase.
@@ -354,6 +381,30 @@ install_manuals_1() {
 		done
 	done
 }
+install_docbook_manuals_1() {
+	local section language="${1:-.}"
+	for section in 1 2 3 4 5 6 7 8 9
+	do
+		# All of the commands that have their own manual pages
+		(
+			! test -r package/commands${section} || cat package/commands${section}
+			! test -r package/extra-manpages${section} || cat package/extra-manpages${section}
+		) |
+		while read -r i
+		do
+			mv -f -- manual/"${language}"/docbook${section}/"$i".xml{new} manual/"${language}"/docbook${section}/"$i".xml
+		done
+		# All of the manual pages for aliases
+		! test -r package/aliases${section} || cat package/aliases${section} |
+		while read -r command alias
+		do
+			! test -r package/commands${section} || ! grep -q -- "^${alias}\$" package/commands${section} || continue
+			! test -r package/extra-manpages${section} || ! grep -q -- "^${alias}\$" package/extra-manpages${section} || continue
+			mv -f -- manual/"${language}"/docbook${section}/"${alias}".xml{new} manual/"${language}"/docbook${section}/"${alias}".xml
+		done
+	done
+}
+
 
 # ##############################################################################
 # Handy symbolic links for modern systems with UTF-8 locales dealing with mono-locale manual pages.
